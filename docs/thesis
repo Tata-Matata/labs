@@ -1,0 +1,105 @@
+Security/Isolation metrics:
+namespace breakout resistance (qualitative + known CVEs)
+privilege model (rootless/rootful)
+syscall surface / sandbox model
+Performance metrics:
+startup latency
+CPU overhead
+memory overhead
+disk/network throughput
+Operational metrics:
+density (labs per node)
+cleanup reliability
+implementation complexity
+
+
+
+
+1) Research goal
+Compare VM, container, Kata Containers, gVisor for interactive DevOps labs by:
+
+Security
+Isolation
+Performance
+Operational suitability
+2) Research questions and hypotheses
+RQ1: Which runtime gives the strongest practical isolation for untrusted learners?
+RQ2: What is the startup/performance cost of stronger isolation?
+RQ3: Which runtime gives the best balance for lab UX and infrastructure cost?
+Example hypotheses:
+
+H1: VM/Kata provide stronger isolation than plain containers.
+H2: Stronger isolation increases startup latency and memory overhead.
+H3: gVisor improves syscall isolation with moderate performance penalty.
+3) Test matrix
+Use fixed combinations:
+
+Dimension	Values
+Runtime	VM, container (runc), Kata, gVisor
+Workload	Linux CLI lab, Kubernetes lab, Terraform lab
+Concurrency	1, 10, 50 simultaneous labs
+Trial count	>= 30 per scenario
+Control variables:
+
+Same host hardware
+Same base image where possible
+Same task script and time limit
+Same network/storage class
+4) Metrics
+Security/Isolation
+Privilege mode required (root/rootless)
+Default capabilities
+Syscall filtering/sandbox model
+Filesystem and network isolation boundaries
+Escape surface review (documented CVEs, attack classes)
+Optional controlled breakout tests (safe PoCs only)
+Performance
+Provisioning latency (click → ready terminal)
+Runtime startup time
+CPU overhead (% vs baseline task time)
+Memory overhead (RSS/working set)
+Disk I/O throughput
+Network throughput/latency
+Operational
+Max lab density per node
+Failure rate (provisioning/cleanup)
+Recovery time after failure
+Implementation complexity (LoC/config count/time-to-setup)
+5) Experiment procedure
+Prepare clean host/cluster.
+Warm-up run (not counted).
+Execute scenario N times (randomized order).
+Collect raw metrics automatically.
+Reset environment between runs.
+Repeat under different concurrency levels.
+Store all logs/artifacts with run IDs.
+6) Tooling (suggested)
+Load orchestration: Go benchmark runner (your backend can trigger labs)
+System metrics: Prometheus + Node Exporter + cAdvisor
+Tracing/timing: OpenTelemetry or simple Go timestamps
+Network tests: iperf3
+Disk tests: fio
+CPU/memory tests: sysbench, /proc, cgroup stats
+K8s visibility: kubectl top, metrics-server
+Security checks: trivy, kube-bench, runtime docs/CVE review
+7) Data format (recommended)
+Record each run as one row:
+
+run_id, timestamp, runtime, workload, concurrency, startup_ms, ready_ms, cpu_pct, mem_mb, disk_mbps, net_mbps, provision_ok, cleanup_ok, notes
+8) Analysis method
+Use median + p95 (not only average)
+Show boxplots per runtime
+Statistical test:
+Normal: ANOVA
+Non-normal: Kruskal-Wallis + post-hoc Dunn
+Report effect size, not only p-values
+9) Threats to validity
+Host noise / background load
+Different maturity of runtime integrations
+Non-identical image/kernel paths
+Benchmark selection bias (too synthetic)
+10) Deliverables
+Reproducible scripts
+Raw CSV/JSON data
+Plots and statistical outputs
+Final decision matrix (security vs performance vs ops)
