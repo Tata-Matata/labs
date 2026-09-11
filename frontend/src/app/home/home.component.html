@@ -1,0 +1,17 @@
+<div class="page">
+  <header class="page-header">
+    <h1>DevOps Labs</h1>
+    <p>Select a task to begin</p>
+  </header>
+
+  <div class="lab-grid">
+    <div
+      class="lab-box"
+      *ngFor="let lab of labs"
+      (click)="selectLab(lab)"
+    >
+      <div class="lab-title">{{ lab.title }}</div>
+      <div class="lab-description">{{ lab.description }}</div>
+    </div>
+  </div>
+</div>

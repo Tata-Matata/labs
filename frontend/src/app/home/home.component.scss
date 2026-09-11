@@ -1,0 +1,66 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #ffffff;
+  color: #000000;
+}
+
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 3rem;
+
+  h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.02em;
+  }
+
+  p {
+    color: #555;
+    margin: 0;
+  }
+}
+
+.lab-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+
+.lab-box {
+  background: #000000;
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 1.75rem 1.5rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  user-select: none;
+
+  &:hover {
+    transform: translateY(-2px);
+    opacity: 0.85;
+  }
+
+  &:active {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+}
+
+.lab-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.lab-description {
+  font-size: 0.85rem;
+  color: #cccccc;
+}
