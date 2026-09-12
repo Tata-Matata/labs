@@ -14,4 +14,11 @@
       <div class="lab-description">{{ lab.description }}</div>
     </div>
   </div>
+
+  <p *ngIf="loadError" style="color: red; text-align: center;">{{ loadError }}</p>
+
+  <div class="instructions-panel" *ngIf="selectedInstructions">
+    <h2>Instructions</h2>
+    <p>{{ selectedInstructions }}</p>
+  </div>
 </div>

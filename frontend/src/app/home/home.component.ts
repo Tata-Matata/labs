@@ -1,11 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-
-interface Lab {
-  id: string;
-  title: string;
-  description: string;
-}
+import { LabService, LabDetail } from '../lab.service';
 
 @Component({
   selector: 'app-home',
@@ -14,18 +9,24 @@ interface Lab {
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
-export class HomeComponent {
-  labs: Lab[] = [
-    { id: 'k8s-basics', title: 'Kubernetes Basics', description: 'Pods, Deployments, Services' },
-    { id: 'terraform-intro', title: 'Terraform Intro', description: 'Providers, Resources, State' },
-    { id: 'linux-fundamentals', title: 'Linux Fundamentals', description: 'Filesystem, Permissions, Processes' },
-    { id: 'k8s-networking', title: 'Kubernetes Networking', description: 'Ingress, NetworkPolicy, DNS' },
-    { id: 'terraform-modules', title: 'Terraform Modules', description: 'Reusable Infrastructure' },
-    { id: 'linux-scripting', title: 'Linux Scripting', description: 'Bash, Cron, Automation' }
-  ];
+export class HomeComponent implements OnInit {
+  labs: LabDetail[] = [];
+  selectedInstructions: string | null = null;
+  loadError: string | null = null;
 
-  selectLab(lab: Lab): void {
-    console.log('Selected lab:', lab.id);
-    // TODO: navigate to lab session route
+  constructor(private labService: LabService) {}
+
+  ngOnInit(): void {
+    this.labService.getLabs().subscribe({
+      next: (labs) => (this.labs = labs),
+      error: (err) => {
+        console.error('Failed to load labs', err);
+        this.loadError = 'Failed to load labs. Is the backend running on port 8080?';
+      }
+    });
+  }
+
+  selectLab(lab: LabDetail): void {
+    this.selectedInstructions = lab.instructions;
   }
 }
