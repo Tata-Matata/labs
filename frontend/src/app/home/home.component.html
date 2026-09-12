@@ -5,20 +5,29 @@
   </header>
 
   <div class="lab-grid">
-    <div
-      class="lab-box"
-      *ngFor="let lab of labs"
-      (click)="selectLab(lab)"
-    >
-      <div class="lab-title">{{ lab.title }}</div>
-      <div class="lab-description">{{ lab.description }}</div>
+    @for (lab of labs(); track lab.id) {
+      <div class="lab-box" (click)="selectLab(lab)">
+        <div class="lab-title">{{ lab.title }}</div>
+        <div class="lab-description">{{ lab.description }}</div>
+      </div>
+    }
+  </div>
+
+  @if (loadError()) {
+    <p style="color: red; text-align: center;">{{ loadError() }}</p>
+  }
+
+  @if (selectedInstructions()) {
+    <div class="instructions-panel">
+      <h2>Instructions</h2>
+      <p>{{ selectedInstructions() }}</p>
     </div>
-  </div>
+  }
 
-  <p *ngIf="loadError" style="color: red; text-align: center;">{{ loadError }}</p>
-
-  <div class="instructions-panel" *ngIf="selectedInstructions">
-    <h2>Instructions</h2>
-    <p>{{ selectedInstructions }}</p>
-  </div>
+  @if (showTerminal()) {
+    <div class="terminal-panel">
+      <h2>Terminal</h2>
+      <app-terminal></app-terminal>
+    </div>
+  }
 </div>
