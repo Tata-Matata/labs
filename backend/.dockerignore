@@ -1,0 +1,9 @@
+.git
+.github
+Dockerfile
+README.md
+*.log
+.env
+.env.*
+bin
+tmp
