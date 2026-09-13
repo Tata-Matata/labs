@@ -45,7 +45,7 @@ jobs:
       # NOTE: trivy-action version is pinned in 3 places in this file
       # (fs scan + 2 image scans). Update all three together when bumping.
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -94,14 +94,14 @@ jobs:
           cache-to: type=gha,mode=max,scope=frontend
 
       - name: Trivy scan backend image
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
           severity: HIGH,CRITICAL
           exit-code: 1
 
       - name: Trivy scan frontend image
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
           severity: HIGH,CRITICAL
