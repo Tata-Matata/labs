@@ -40,11 +40,28 @@ jobs:
   trivy-fs-scan:
     runs-on: ubuntu-latest
     needs: [test-backend, test-frontend]
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
       # NOTE: trivy-action version is pinned in 3 places in this file
       # (fs scan + 2 image scans). Update all three together when bumping.
       - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-fs-results.sarif
+          exit-code: 0
+      - name: Upload Trivy fs scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-fs-results.sarif
+          category: trivy-fs
+      - name: Fail if vulnerabilities found
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
@@ -59,6 +76,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     steps:
       - uses: actions/checkout@v4
 
@@ -98,6 +116,19 @@ jobs:
         with:
           image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
           severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-backend-results.sarif
+          exit-code: 0
+      - name: Upload Trivy backend scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-backend-results.sarif
+          category: trivy-backend
+      - name: Fail if backend image has vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
           exit-code: 1
 
       - name: Trivy scan frontend image
@@ -105,16 +136,17 @@ jobs:
         with:
           image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
           severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-frontend-results.sarif
+          exit-code: 0
+      - name: Upload Trivy frontend scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-frontend-results.sarif
+          category: trivy-frontend
+      - name: Fail if frontend image has vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
           exit-code: 1
-
-      - name: Push backend image
-        run: |
-          docker tag ${{ env.BACKEND_IMAGE }}:${{ github.sha }} ${{ env.BACKEND_IMAGE }}:latest
-          docker push ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
-          docker push ${{ env.BACKEND_IMAGE }}:latest
-
-      - name: Push frontend image
-        run: |
-          docker tag ${{ env.FRONTEND_IMAGE }}:${{ github.sha }} ${{ env.FRONTEND_IMAGE }}:latest
-          docker push ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
-          docker push ${{ env.FRONTEND_IMAGE }}:latest
