@@ -10,7 +10,6 @@ env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/labs-backend
   FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/labs-frontend
-  TRIVY_ACTION_VERSION: 0.36.0
 
 jobs:
   test-backend:
@@ -44,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@${{ env.TRIVY_ACTION_VERSION }}
+        uses: aquasecurity/trivy-action@${{ vars.TRIVY_ACTION_VERSION }}
         with:
           scan-type: fs
           scan-ref: .
@@ -93,14 +92,14 @@ jobs:
           cache-to: type=gha,mode=max,scope=frontend
 
       - name: Trivy scan backend image
-        uses: aquasecurity/trivy-action@${{ env.TRIVY_ACTION_VERSION }}
+        uses: aquasecurity/trivy-action@${{ vars.TRIVY_ACTION_VERSION }}
         with:
           image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
           severity: HIGH,CRITICAL
           exit-code: 1
 
       - name: Trivy scan frontend image
-        uses: aquasecurity/trivy-action@${{ env.TRIVY_ACTION_VERSION }}
+        uses: aquasecurity/trivy-action@${{ vars.TRIVY_ACTION_VERSION }}
         with:
           image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
           severity: HIGH,CRITICAL
