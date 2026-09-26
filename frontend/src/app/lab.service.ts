@@ -11,7 +11,7 @@ export interface LabDetail {
 
 @Injectable({ providedIn: 'root' })
 export class LabService {
-  private baseUrl = 'http://localhost:8080/api/labs';
+  private baseUrl = '/api/labs';
 
   constructor(private http: HttpClient) {}
 

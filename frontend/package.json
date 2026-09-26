@@ -1,12 +1,18 @@
 {
   "name": "frontend",
   "version": "0.0.0",
+  "engines": {
+    "node": "26.8.2",
+    "npm": ">=11.0.0"
+  },
   "scripts": {
+    "check:runtime": "node -e \"const expected=require('./package.json').engines.node; const actual=process.versions.node; if (actual !== expected) { console.error('Expected Node.js ' + expected + ' but found ' + actual); process.exit(1); }\"",
+    "preinstall": "npm run check:runtime",
     "ng": "ng",
-    "start": "ng serve",
-    "build": "ng build",
-    "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "start": "npm run check:runtime && ng serve",
+    "build": "npm run check:runtime && ng build",
+    "watch": "npm run check:runtime && ng build --watch --configuration development",
+    "test": "npm run check:runtime && ng test"
   },
   "private": true,
   "packageManager": "npm@11.6.2",

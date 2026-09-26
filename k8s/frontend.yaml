@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: labs-frontend
+  namespace: labs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: labs-frontend
+  template:
+    metadata:
+      labels:
+        app: labs-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/tata-matata/labs-frontend:v1.0.0
+          ports:
+            - containerPort: 8080
+          env:
+            - name: BACKEND_HOST
+              value: labs-backend
+            - name: BACKEND_PORT
+              value: "8080"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: labs-frontend
+  namespace: labs
+spec:
+  type: LoadBalancer
+  selector:
+    app: labs-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

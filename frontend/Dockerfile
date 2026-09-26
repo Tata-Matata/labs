@@ -11,6 +11,9 @@ RUN npm run build
 FROM nginxinc/nginx-unprivileged:stable-alpine3.24@sha256:4714e0b1b2577eaa1a6131d07c958b67f0eb68e6d0521e90c6e5287db8cf0bc5
 USER root
 RUN apk upgrade --no-cache libexpat
-USER 101
+ENV BACKEND_HOST=labs-backend
+ENV BACKEND_PORT=8080
+COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist/frontend/browser /usr/share/nginx/html
+USER 101
 EXPOSE 8080

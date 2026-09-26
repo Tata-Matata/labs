@@ -26,7 +26,7 @@ export class HomeComponent implements OnInit {
       },
       error: (err) => {
         console.error('Failed to load labs', err);
-        this.loadError.set('Failed to load labs. Is the backend running on port 8080?');
+        this.loadError.set('Failed to load labs. Check that the backend API is reachable.');
       }
     });
   }

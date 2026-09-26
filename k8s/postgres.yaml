@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: labs-postgres
+  namespace: labs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: labs-postgres
+  template:
+    metadata:
+      labels:
+        app: labs-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: labs-app-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: labs-app-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: labs-app-secrets
+                  key: POSTGRES_PASSWORD
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: labs-postgres-data
+        - name: postgres-init
+          configMap:
+            name: labs-postgres-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: labs-postgres
+  namespace: labs
+spec:
+  selector:
+    app: labs-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
