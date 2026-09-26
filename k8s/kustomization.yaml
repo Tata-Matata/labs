@@ -4,6 +4,7 @@ resources:
   - namespace.yaml
   - secret.yaml
   - postgres-init-configmap.yaml
+  - postgres-pv.yaml
   - postgres-pvc.yaml
   - postgres.yaml
   - backend.yaml

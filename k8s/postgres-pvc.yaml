@@ -4,6 +4,8 @@ metadata:
   name: labs-postgres-data
   namespace: labs
 spec:
+  storageClassName: manual
+  volumeName: labs-postgres-pv
   accessModes:
     - ReadWriteOnce
   resources:
