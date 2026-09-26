@@ -72,7 +72,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     needs: [trivy-fs-scan]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       packages: write
@@ -80,27 +80,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set lowercase image names
+      - name: Set image names and tags
         run: |
           echo "BACKEND_IMAGE=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/labs-backend" >> "$GITHUB_ENV"
           echo "FRONTEND_IMAGE=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/labs-frontend" >> "$GITHUB_ENV"
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          echo "IMAGE_VERSION=0.0.${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "COMMIT_TAG=sha-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          echo "BACKEND_LOCAL_IMAGE=labs-backend:ci" >> "$GITHUB_ENV"
+          echo "FRONTEND_LOCAL_IMAGE=labs-frontend:ci" >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push backend image
+      - name: Build backend image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          tags: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
-          push: true
+          tags: ${{ env.BACKEND_LOCAL_IMAGE }}
+          load: true
           # GitHub Actions cache backend (type=gha) persists BuildKit layer
           # cache (including npm cache mounts) across separate CI runs on
           # different ephemeral runners, via GitHub's cache storage service.
@@ -109,12 +106,12 @@ jobs:
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
-      - name: Build and push frontend image
+      - name: Build frontend image
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
-          tags: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
-          push: true
+          tags: ${{ env.FRONTEND_LOCAL_IMAGE }}
+          load: true
           # See comment above on backend build re: type=gha cache persistence.
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
@@ -122,7 +119,7 @@ jobs:
       - name: Trivy scan backend image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          image-ref: ${{ env.BACKEND_LOCAL_IMAGE }}
           severity: HIGH,CRITICAL
           format: sarif
           output: trivy-backend-results.sarif
@@ -135,14 +132,14 @@ jobs:
       - name: Fail if backend image has vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          image-ref: ${{ env.BACKEND_LOCAL_IMAGE }}
           severity: HIGH,CRITICAL
           exit-code: 1
 
       - name: Trivy scan frontend image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          image-ref: ${{ env.FRONTEND_LOCAL_IMAGE }}
           severity: HIGH,CRITICAL
           format: sarif
           output: trivy-frontend-results.sarif
@@ -155,6 +152,27 @@ jobs:
       - name: Fail if frontend image has vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          image-ref: ${{ env.FRONTEND_LOCAL_IMAGE }}
           severity: HIGH,CRITICAL
           exit-code: 1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push backend image
+        run: |
+          docker tag "$BACKEND_LOCAL_IMAGE" "$BACKEND_IMAGE:$IMAGE_VERSION"
+          docker tag "$BACKEND_LOCAL_IMAGE" "$BACKEND_IMAGE:$COMMIT_TAG"
+          docker push "$BACKEND_IMAGE:$IMAGE_VERSION"
+          docker push "$BACKEND_IMAGE:$COMMIT_TAG"
+
+      - name: Tag and push frontend image
+        run: |
+          docker tag "$FRONTEND_LOCAL_IMAGE" "$FRONTEND_IMAGE:$IMAGE_VERSION"
+          docker tag "$FRONTEND_LOCAL_IMAGE" "$FRONTEND_IMAGE:$COMMIT_TAG"
+          docker push "$FRONTEND_IMAGE:$IMAGE_VERSION"
+          docker push "$FRONTEND_IMAGE:$COMMIT_TAG"
