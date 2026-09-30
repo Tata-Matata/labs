@@ -21,6 +21,7 @@ type Lab struct {
 var dbPool *pgxpool.Pool
 
 func main() {
+	//DB INIT - to  be reworked
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		dsn = "postgres://labs:labs@localhost:5432/labs"
@@ -33,27 +34,18 @@ func main() {
 	defer pool.Close()
 	dbPool = pool
 
+	//API endpoints
+
+	// HTTP router between handlers
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/labs", withCORS(listLabsHandler))
-	mux.HandleFunc("/api/labs/", withCORS(getLabHandler))
+	mux.HandleFunc("/api/labs", listLabsHandler)
+	mux.HandleFunc("/api/labs/", getLabHandler)
+	mux.HandleFunc("/api/terminal/stream", terminalStreamHandler)
 
 	addr := ":8080"
 	log.Printf("server listening on %s", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal(err)
-	}
-}
-
-func withCORS(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next(w, r)
 	}
 }
 

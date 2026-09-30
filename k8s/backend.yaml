@@ -13,6 +13,7 @@ spec:
       labels:
         app: labs-backend
     spec:
+      serviceAccountName: labs-backend
       containers:
         - name: backend
           image: ghcr.io/tata-matata/labs-backend:v1.0.0
@@ -24,6 +25,14 @@ spec:
                 secretKeyRef:
                   name: labs-app-secrets
                   key: DATABASE_URL
+            - name: TERMINAL_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: TERMINAL_POD_LABEL_SELECTOR
+              value: app=lab-shell
+            - name: TERMINAL_CONTAINER
+              value: shell
           readinessProbe:
             httpGet:
               path: /api/labs
@@ -49,3 +58,36 @@ spec:
     - name: http
       port: 8080
       targetPort: 8080
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: labs-backend
+  namespace: labs
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: labs-backend-terminal
+  namespace: labs
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: labs-backend-terminal
+  namespace: labs
+subjects:
+  - kind: ServiceAccount
+    name: labs-backend
+    namespace: labs
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: labs-backend-terminal

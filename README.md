@@ -32,9 +32,12 @@ At the moment, the application is split into three runtime services:
 - `labs-frontend`: serves the web UI
 - `labs-backend`: serves the API and reads lab content from PostgreSQL
 - `labs-postgres`: stores lab metadata and seed content
+- `labs-shell`: provides the Linux container that the browser terminal execs into
 
 The frontend talks to the backend through `/api`, and the backend reads its
-connection details from environment configuration.
+connection details from environment configuration. The browser terminal is now
+backed by a websocket stream that the backend bridges into the `labs-shell`
+pod via Kubernetes `pods/exec`.
 
 ## Repository layout
 

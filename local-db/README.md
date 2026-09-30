@@ -4,13 +4,13 @@
 
 ### 1. Database (PostgreSQL via Docker Compose)
 
-Schema and seed data live in `db/init/*.sql` and are automatically applied
+Schema and seed data live in the repository-level `../db/init/*.sql` directory and are automatically applied
 on the **first** startup of the Postgres container (via Postgres's
 `docker-entrypoint-initdb.d` mechanism).
 
 ```bash
-cd c:\myprojects\labs
-docker compose up -d
+cd {{labs}}/local-db
+sudo docker compose up -d
 ```
 
 This starts Postgres on `localhost:5432`:
