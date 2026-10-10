@@ -5,6 +5,8 @@ import {
   OnDestroy,
   ViewChild
 } from '@angular/core';
+
+//JavaScript terminal emulator
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 
@@ -21,16 +23,38 @@ interface TerminalMessage {
   template: `<div #terminalContainer class="terminal-container"></div>`,
   styleUrls: ['./terminal.component.scss']
 })
+
+// AfterViewInit = after Angular has created the component's view/DOM
+// important here because xterm needs an actual DOM element to attach itself to.
 export class TerminalComponent implements AfterViewInit, OnDestroy {
+  //`!` is TypeScript's definite assignment assertion. 
+  // Without it, TypeScript might complain: Property 'terminalContainer' has no initializer. Because you don't do:
+  //terminalContainer = ... . 
+  // Angular populates it later. So you're telling TypeScript
+  //that Angular will initialize this before using it
   @ViewChild('terminalContainer', { static: true })
   terminalContainer!: ElementRef<HTMLDivElement>;
 
+  // will have been initialized later, before it is used
+  // without it Typescript complains that not initialized in constructor
+  // compare to private socket?: WebSocket = may not be initialized
   private term!: Terminal;
+
+  //Creates an xterm addon responsible for fitting the terminal to its container.
+  // this.fitAddon.fit();
   private readonly fitAddon = new FitAddon();
+
+  //websocket is optional (socket: WebSocket | undefined)
+  // Initially there is no WebSocket.
   private socket?: WebSocket;
   private resizeObserver?: ResizeObserver;
+
+  // onData and onResize return disposable objects
+  // these will be stored in the array
+  // disposable.dispose(); will remove the event listeners in ngOnDestroy
   private terminalDisposables: Array<{ dispose(): void }> = [];
 
+  //xterm attaches itself to the DOM component already created earlier
   ngAfterViewInit(): void {
     this.term = new Terminal({
       cursorBlink: true,
@@ -42,21 +66,33 @@ export class TerminalComponent implements AfterViewInit, OnDestroy {
       }
     });
     this.term.loadAddon(this.fitAddon);
-
+    
+    //attach yourself to <div #terminalContainer class="terminal-container"></div>
     this.term.open(this.terminalContainer.nativeElement);
     this.term.writeln('Connecting to lab container...');
+
+
     this.term.focus();
     this.fitTerminal();
+
+    // if browser resized - terminal <div> changed size
+    // xterm recalculates cols/rows --> backend is told about new terminal size
+    // PTY gets resized
     this.watchContainerResize();
 
+    // event listeners to be disposed in ngOnDestroy
+    // onData is for sending input data via WebSocket to backend
+    // onResize for sending new number of rows and columns via WebSocket to backend
     this.terminalDisposables.push(
       this.term.onData((data) => this.forwardInput(data)),
       this.term.onResize(({ cols, rows }) => this.sendResize(cols, rows))
     );
 
+
     this.connect();
   }
 
+  //connect and manage connection to backend via WebSocket
   private connect(): void {
     this.socket = new WebSocket(this.buildSocketUrl());
 
@@ -120,6 +156,10 @@ export class TerminalComponent implements AfterViewInit, OnDestroy {
     this.resizeObserver.observe(this.terminalContainer.nativeElement);
   }
 
+  // queueMicrotask = DOM/layout may still be in the process of updating 
+  // when the resize callback executes. 
+  // Scheduling fit() allows the current operation to finish 
+  // before xterm measures the element.
   private fitTerminal(): void {
     queueMicrotask(() => this.fitAddon.fit());
   }

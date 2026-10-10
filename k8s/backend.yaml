@@ -20,11 +20,11 @@ spec:
           ports:
             - containerPort: 8080
           env:
-            - name: DATABASE_URL
+            - name: DB_URL
               valueFrom:
                 secretKeyRef:
                   name: labs-app-secrets
-                  key: DATABASE_URL
+                  key: DB_URL
             - name: TERMINAL_NAMESPACE
               valueFrom:
                 fieldRef:

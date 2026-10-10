@@ -37,9 +37,8 @@ go mod tidy
 go run ./cmd/server
 ```
 
-Backend listens on `http://localhost:8080`. Set `DATABASE_URL` env var to
-override the default connection string
-(`postgres://labs:labs@localhost:5432/labs`).
+Backend listens on `http://localhost:8080`. Set `DB_URL` to your local
+PostgreSQL connection string before starting the server.
 
 ### 3. Frontend (Angular)
 
