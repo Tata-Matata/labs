@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,31 +21,11 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-const terminalStreamPath = "/api/terminal/stream"
-
 var terminalUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			return true
-		}
-
-		originURL, err := url.Parse(origin)
-		if err == nil && originURL.Host != "" && sameHost(originURL.Host, r.Host) {
-			return true
-		}
-
-		allowedOrigins := splitAndTrim(os.Getenv("ALLOWED_ORIGINS"))
-		for _, allowedOrigin := range allowedOrigins {
-			if origin == allowedOrigin {
-				return true
-			}
-		}
-
-		return false
-	},
+	// against cross site web socket hijacking
+	CheckOrigin:     checkOrigin,
 }
 
 type terminalMessage struct {
@@ -68,6 +47,7 @@ type wsWriter struct {
 	mu   sync.Mutex
 }
 
+// implements interface io.Writer so that wsWriter implicitly implements io.Writer
 func (w *wsWriter) Write(p []byte) (int, error) {
 	message := terminalMessage{Type: "output", Data: string(p)}
 
@@ -176,7 +156,7 @@ func (q *wsResizeQueue) Next() *remotecommand.TerminalSize {
 	next := q.queue[0]
 	q.queue = q.queue[1:]
 	return &next
-	}
+}
 
 func terminalStreamHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -367,13 +347,4 @@ func splitAndTrim(value string) []string {
 		}
 	}
 	return trimmed
-}
-
-func sameHost(left, right string) bool {
-	leftParts := strings.Split(left, ":")
-	rightParts := strings.Split(right, ":")
-	if len(leftParts) == 0 || len(rightParts) == 0 {
-		return false
-	}
-	return strings.EqualFold(leftParts[0], rightParts[0])
 }
