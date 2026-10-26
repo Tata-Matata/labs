@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -34,6 +35,12 @@ type Server struct {
 }
 
 func main() {
+
+	// load env vars from .env file if it exists
+	if err := godotenv.Load(".env"); err != nil {
+		log.Printf("No .env file found, using existing environment variables")
+	}
+
 	dsn := os.Getenv("DB_URL")
 	if strings.TrimSpace(dsn) == "" {
 		log.Fatal("DB_URL is required")
