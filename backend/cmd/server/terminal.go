@@ -47,7 +47,9 @@ type websocketWriter struct {
 	mu   sync.Mutex
 }
 
-// implements interface io.Writer so that websocketWriter implicitly implements io.Writer
+// implements interface io.Writer that is expected by K8s StreamWithContext 
+// it uses io.Writer to store stdout and stderr from shell
+// slice p contains this stream content and will be passed back to fronted xterm
 func (w *websocketWriter) Write(p []byte) (int, error) {
 	message := terminalMessage{Type: "output", Data: string(p)}
 
@@ -242,6 +244,7 @@ func execCommandsInPod(input *websocketInputBuffer, resizes *websocketResizeQueu
 		return
 	}
 
+	// channel to send shell stdout or stderr from shell back to frontend xterm
 	output := &websocketWriter{conn: conn}
 
 	if err := executor.StreamWithContext(ctx, remotecommand.StreamOptions{
@@ -437,7 +440,12 @@ func resolveRunningPod(ctx context.Context, clientset kubernetes.Interface, name
 }
 
 func writeTerminalError(conn *websocket.Conn, message string) {
+
+	// application level message before the connection is closed on Websocket level
+	// this message is expected by frontend
 	_ = conn.WriteJSON(terminalMessage{Type: "error", Data: message})
+
+	// WebSocket protocol frame - a Close frame
 	_ = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, message))
 }
 
