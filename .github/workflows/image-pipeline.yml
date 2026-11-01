@@ -90,6 +90,13 @@ jobs:
       contents: read
       packages: write
       security-events: write
+    env: 
+      TRIVY_BACKEND_FIXED: trivy-backend-results-fixed.sarif
+      TRIVY_BACKEND_UNFIXED: trivy-backend-results-unfixed.sarif
+      TRIVY_BACKEND_FIXED: trivy-frontend-results-fixed.sarif
+      TRIVY_BACKEND_UNFIXED: trivy-frontend-results-unfixed.sarif
+      FRONTEND_BASE_IMAGE: nginxinc/nginx-unprivileged:stable-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
+      BACKEND_BASE_IMAGE: gcr.io/distroless/static-debian12
     steps:
       - uses: actions/checkout@v4
         with:
@@ -117,7 +124,8 @@ jobs:
           # cache across separate CI and release runs on ephemeral runners.
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
-
+          build-args: |
+            BASE_IMAGE=${{ env.BACKEND_BASE_IMAGE }}
       - name: Build frontend image
         uses: docker/build-push-action@v6
         with:
@@ -126,27 +134,41 @@ jobs:
           load: true
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
-
-      - name: Trivy scan backend image
+        build-args: |
+            BASE_IMAGE=${{ env.FRONTEND_BASE_IMAGE }}
+      # Only report vulnerabilities for which a fix is available
+      - name: Trivy scan backend image for CVEs with fixes
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.BACKEND_LOCAL_IMAGE }}
           severity: HIGH,CRITICAL
+          ignore-unfixed: true
           format: sarif
-          output: trivy-backend-results.sarif
-          exit-code: 0
+          output: ${{ TRIVY_BACKEND_FIXED }}
+          exit-code: 1
       - name: Upload Trivy backend scan results
         uses: github/codeql-action/upload-sarif@v3
+        if: always()
         with:
-          sarif_file: trivy-backend-results.sarif
-          category: trivy-backend
-      - name: Fail if backend image has vulnerabilities
+          sarif_file: ${{ TRIVY_BACKEND_FIXED }}
+          category: trivy-backend-fixed
+      # Report all vulnerabilities but those with fixes should be already filtered out by previous step
+      # so effectively - this is policy for CVEs that do not have fix yet
+      - name: Trivy scan backend image for CVEs with and without fixes
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.BACKEND_LOCAL_IMAGE }}
           severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: ${{ TRIVY_BACKEND_FIXED }}
           exit-code: 1
-
+      - name: Upload Trivy backend scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: ${{ TRIVY_BACKEND_FIXED }}
+          category: trivy-backend-fixed
       - name: Trivy scan frontend image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
