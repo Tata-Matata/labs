@@ -1,0 +1,42 @@
+name: Run Trivy scan on temporary image generated with apk upgrade
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'Docker image to run apk upgrade and then Trivy scan on'
+        required: true
+        type: string
+      vulnerabilities:
+        description: 'Comma separated list of CVEs to search for in Trivy report'
+        required: true
+        type: string
+
+jobs:
+  test-apk-upgraded-scan:
+    env:
+      CONTAINER: tmp-container-apk-upgrade
+      TMP_IMAGE: tmp-image-apk-upgrade
+      TRIVY_REPORT: trivy-report.json
+    runs-on: ubuntu-latest
+    steps:
+    - name: Pull base image
+      run: docker pull "${{ inputs.image }}"
+    - name: Create container from base image
+      run: docker run -d --name "$CONTAINER" "${{ inputs.image }}" sleep infinity
+    - name: Exec into container and run apk upgrade
+      run: docker exec "$CONTAINER" apk upgrade
+    - name: Create temporary image
+      run: docker commit "$CONTAINER" "$TMP_IMAGE"
+    - name: Run Trivy scan on temporary image
+      uses: aquasecurity/trivy-action@v0.36.0
+      with:
+        image-ref: "$TMP_IMAGE"
+        severity: HIGH,CRITICAL
+        format: 'json'
+        exit-code: 0
+        scan-type: image
+        output: "$TRIVY_REPORT"
+    - name: Check certain CVEs in Trivy report
+      run: deno run --allow-read="$TRIVY_REPORT" ./trivy/trivy-find.ts --report "$TRIVY_REPORT" --vulnerabilities "${{ inputs.vulnerabilities }}"
+      
