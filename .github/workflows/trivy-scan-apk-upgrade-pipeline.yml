@@ -25,18 +25,18 @@ jobs:
     - name: Create container from base image
       run: docker run -d --name "$CONTAINER" "${{ inputs.image }}" sleep infinity
     - name: Exec into container and run apk upgrade
-      run: docker exec "$CONTAINER" apk upgrade
+      run: docker exec ${{ env.CONTAINER }}  apk upgrade
     - name: Create temporary image
-      run: docker commit "$CONTAINER" "$TMP_IMAGE"
+      run: docker commit ${{ env.CONTAINER }}  ${{ env.TMP_IMAGE }} 
     - name: Run Trivy scan on temporary image
       uses: aquasecurity/trivy-action@v0.36.0
       with:
-        image-ref: "$TMP_IMAGE"
+        image-ref: ${{ env.TMP_IMAGE }}
         severity: HIGH,CRITICAL
         format: 'json'
         exit-code: 0
         scan-type: image
-        output: "$TRIVY_REPORT"
+        output: ${{ env.TRIVY_REPORT }}
     - name: Check certain CVEs in Trivy report
       run: deno run --allow-read="$TRIVY_REPORT" ./trivy/trivy-find.ts --report "$TRIVY_REPORT" --vulnerabilities "${{ inputs.vulnerabilities }}"
       
