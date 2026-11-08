@@ -16,9 +16,10 @@ export async function parseReport(filePath: string): Promise<Vulnerability[]> {
   console.log(`Parsing Trivy report ${filePath}`);
 
   const rawContent = await Deno.readTextFile(filePath);
+  const jsonData = JSON.parse(rawContent);
 
   // runtime and compile time schema check
-  const report: TrivyReport = TrivyReportSchema.parse(JSON.parse(rawContent));
+  const report: TrivyReport = TrivyReportSchema.parse(jsonData);
 
   const results: TrivyResult[] = report.Results;
 

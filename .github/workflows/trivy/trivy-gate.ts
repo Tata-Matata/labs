@@ -4,6 +4,8 @@ import { parseReport } from "./trivy-parse-report.ts";
 import {
   type CveIgnoreEntry,
   CveIgnoreEntrySchema,
+  CveIgnoreFile,
+  CveIgnoreSchema,
   type DockerhubImage,
   DockerhubSchema,
   type GcrIoImage,
@@ -38,7 +40,7 @@ try {
     console.log(`No action needed on found CVEs`);
     Deno.exit(0);
   } else {
-    console.log(`Found CVEs that require manual intervention: ${failures}`);
+    console.log(`Found CVEs that require manual intervention: :\n${JSON.stringify(failures, null, 2)}`);
     Deno.exit(1);
   }
 } catch (error) {
@@ -59,6 +61,7 @@ async function analyzeCVEs(
     const result: CveEvalResult = await analyzeCVE(cve);
 
     console.log(`Result: ${JSON.stringify(result, null, 2)}`);
+    console.log(`==========================================================`)
 
     results.push(result);
   }
@@ -77,19 +80,19 @@ async function analyzeCVE(cve: Vulnerability): Promise<CveEvalResult> {
     // FixedVersion exists - check latest base image digest
     // if there is a new digest (a newer version has been pushed) - it might contain the CVE fix
     const latestDigest = await getLatestBaseImageDigest();
-    const currentDigest = String(args.BASE_IMAGE).split("@")[1];
+    const currentDigest = String(args.base_image).split("@")[1];
 
     // there is a newer digest; we are using an older one
     if (latestDigest !== currentDigest) {
-      const latestImageWithDigest: string = String(args.BASE_IMAGE).replace(
+      const latestImageWithDigest: string = String(args.base_image).replace(
         currentDigest,
         latestDigest,
       );
       return analyzeLatestDigest(latestImageWithDigest, cve);
-    } 
+    }
   }
 
-  // there is no FixedVersion yet or 
+  // there is no FixedVersion yet or
   // we are already using the latest digest in the pipeline and CVE is not fixed there
   return await checkCveInIgnoreList(cve);
 }
@@ -105,10 +108,10 @@ async function analyzeLatestDigest(
 
   //CVE fixed in latest digest
   if (fixedInLatestDigest) {
+    const message: string = `Update base image to the latest digest ${latestImageWithDigest}. The CVE ${cve.VulnerabilityID} is fixed there`
     return {
       cve: cve.VulnerabilityID,
-      error:
-        `Update base image to the latest digest ${latestImageWithDigest}. The CVE ${cve.VulnerabilityID} is fixed there`,
+      error: message
     };
   }
 
@@ -118,7 +121,7 @@ async function analyzeLatestDigest(
   const checkIgnoreList = await checkCveInIgnoreList(cve);
   if (checkIgnoreList.error == null) {
     console.log(
-      `CVE ${cve.VulnerabilityID} is in ignore list. We are not using the newest digest, but it does not contain DVE fix yet`,
+      `CVE ${cve.VulnerabilityID} is in ignore list. We are not using the newest digest, but the newest digest does not contain CVE fix yet`,
     );
     return checkIgnoreList;
   }
@@ -129,8 +132,7 @@ async function analyzeLatestDigest(
   return {
     cve: cve.VulnerabilityID,
     error:
-      `The CVE ${cve.VulnerabilityID} is not fixed in latest image digest, and it can't be fixed by apk upgrade.
-    Consider adding it to ignore list or testing apk upgrade using separate pipeline`,
+      `The CVE ${cve.VulnerabilityID} is not fixed in latest image digest. Consider adding it to ignore list or testing apk upgrade if base is alpine using separate pipeline`,
   };
 }
 
@@ -170,6 +172,8 @@ async function runTrivyScan(image: string): Promise<Vulnerability[]> {
       "json",
       "--exit-code",
       "0",
+      "--severity",
+      "HIGH,CRITICAL",
       image,
     ],
     stdout: "piped",
@@ -210,7 +214,7 @@ async function getLatestBaseImageDigest(): Promise<string> {
   const raw = await response.json();
   console.log(`API response: ${raw}`);
   const args = parseArgs(Deno.args);
-  const registry = args.REGISTRY;
+  const registry = args.registry;
 
   if (dockerhub(registry)) {
     return getDockerhubImageDigest(raw);
@@ -255,14 +259,14 @@ function getRegistryUrl(): string {
   const args = parseArgs(Deno.args);
 
   //nginxinc/nginx-unprivileged:stable-alpine3.24@shafff
-  const imageWithDigest = args.BASE_IMAGE;
+  const imageWithDigest = args.base_image;
 
   //nginxinc/nginx-unprivileged:stable-alpine3.24
   const base = imageWithDigest.split("@")[0];
 
   // https://hub.docker.com/v2/namespaces
   // https://gcr.io/v2/distroless
-  const registry = args.REGISTRY;
+  const registry = args.registry;
 
   if (dockerhub(registry)) {
     //nginxinc
@@ -290,7 +294,7 @@ function getRegistryUrl(): string {
     return url;
   }
 
-  throw error(`Unknown Registry ${args.REGISTRY}`);
+  throw error(`Unknown Registry ${registry}`);
 }
 
 function dockerhub(registry: string): boolean {
@@ -304,9 +308,7 @@ function gcr(registry: string): boolean {
 async function checkCveInIgnoreList(
   cve: Vulnerability,
 ): Promise<CveEvalResult> {
-  const cveIgnores: CveIgnoreEntry[] = await parseTrivyIgnore(
-    "trivyignore.yaml",
-  );
+  const cveIgnores: CveIgnoreEntry[] = await parseTrivyIgnore();
   const cveIgnoreEntry: CveIgnoreEntry | null = cveInIgnoreList(
     cve,
     cveIgnores,
@@ -354,6 +356,7 @@ function cveInIgnoreList(
   cve: Vulnerability,
   ignoreList: CveIgnoreEntry[],
 ): CveIgnoreEntry | null {
+
   for (const ignore of ignoreList) {
     if (ignore.id === cve.VulnerabilityID) {
       console.log(
@@ -366,15 +369,24 @@ function cveInIgnoreList(
 
   return null;
 }
-async function parseTrivyIgnore(filePath: string): Promise<CveIgnoreEntry[]> {
-  const content = await Deno.readTextFile(filePath);
+async function parseTrivyIgnore(): Promise<CveIgnoreEntry[]> {
 
-  const cveIgnores: CveIgnoreEntry[] = CveIgnoreEntrySchema.array().parse(
-    parse(content),
+  //import.meta.url is a built-in JavaScript/TypeScript property 
+  // that returns the URL of the currently executing module.
+  // file:///home/runner/work/my-repo/my-repo/.github/workflows/trivy/trivy-gate.ts
+  console.log(import.meta.url);
+
+  //import.meta.url resolves the relative path against the URL of this script trivy-gate.ts
+  const filePath = new URL(
+    "./trivyignore.yaml",
+    import.meta.url,
   );
 
-  console.log(`List of ignored CVEs from ${filePath}: ${cveIgnores}`);
+  const content = await Deno.readTextFile(filePath);
+  const ignoreFile: CveIgnoreFile = CveIgnoreSchema.parse(parse(content))
+  const cveIgnores: CveIgnoreEntry[] = ignoreFile.vulnerabilities
+
+  console.log(`List of ignored CVEs from ${filePath}:\n${JSON.stringify(cveIgnores, null, 2)}`);
 
   return cveIgnores ?? [];
 }
-

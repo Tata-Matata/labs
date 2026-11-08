@@ -4,13 +4,13 @@
 
 ### 1. Database (PostgreSQL via Docker Compose)
 
-Schema and seed data live in `db/init/*.sql` and are automatically applied
+Schema and seed data live in the repository-level `../db/init/*.sql` directory and are automatically applied
 on the **first** startup of the Postgres container (via Postgres's
 `docker-entrypoint-initdb.d` mechanism).
 
 ```bash
-cd c:\myprojects\labs
-docker compose up -d
+cd {{labs}}/local-db
+sudo docker compose up -d
 ```
 
 This starts Postgres on `localhost:5432`:
@@ -37,9 +37,8 @@ go mod tidy
 go run ./cmd/server
 ```
 
-Backend listens on `http://localhost:8080`. Set `DATABASE_URL` env var to
-override the default connection string
-(`postgres://labs:labs@localhost:5432/labs`).
+Backend listens on `http://localhost:8080`. Set `DB_URL` to your local
+PostgreSQL connection string before starting the server.
 
 ### 3. Frontend (Angular)
 
