@@ -17,7 +17,7 @@ jobs:
     env:
       CONTAINER: tmp-container-apk-upgrade
       TMP_IMAGE: tmp-image-apk-upgrade
-      TRIVY_REPORT: trivy-report.json
+      TRIVY_JSON_REPORT: trivy-report.json
     runs-on: ubuntu-latest
     steps:
     - name: Pull base image
@@ -36,7 +36,7 @@ jobs:
         format: 'json'
         exit-code: 0
         scan-type: image
-        output: ${{ env.TRIVY_REPORT }}
+        output: ${{ env.TRIVY_JSON_REPORT }}
     - name: Check certain CVEs in Trivy report
-      run: deno run --allow-read="$TRIVY_REPORT" ./trivy/trivy-find.ts --report "$TRIVY_REPORT" --vulnerabilities "${{ inputs.vulnerabilities }}"
+      run: deno run --allow-read="$TRIVY_JSON_REPORT" ./trivy/trivy-find.ts --report "$TRIVY_JSON_REPORT" --vulnerabilities "${{ inputs.vulnerabilities }}"
       
