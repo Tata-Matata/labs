@@ -18,7 +18,7 @@ export const CveIgnoreEntrySchema = z.object({
 
 export const TrivyResultSchema = z.object({
   Target: z.string(),
-  Vulnerabilities: z.array(VulnerabilitySchema).nullable(),
+  Vulnerabilities: z.array(VulnerabilitySchema).nullable().optional(),
 });
 
 export const TrivyReportSchema = z.object({
