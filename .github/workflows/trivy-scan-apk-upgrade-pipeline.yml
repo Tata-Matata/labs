@@ -45,17 +45,6 @@ jobs:
         # latest available stable Deno 2.x release
         deno-version: v2.x
         cache: true
-    - name: Debug workspace
-      run: |
-        echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-        echo "PWD=$(pwd)"
-        echo "Repository root:"
-        ls -la "$GITHUB_WORKSPACE"
-        echo "GitHub directory:"
-        ls -la "$GITHUB_WORKSPACE/.github"
-        echo "Workflow directory:"
-        ls -la "$GITHUB_WORKSPACE/.github/workflows"
     - name: Check certain CVEs in Trivy report
-      working-directory: .github/workflows/trivy
-      run: deno run --allow-read=${{ env.TRIVY_JSON_REPORT }} trivy-find.ts --report "${{ env.TRIVY_JSON_REPORT }}" --vulnerabilities "${{ inputs.vulnerabilities }}"
+      run: deno run --allow-read=${{ env.TRIVY_JSON_REPORT }} .github/workflows/trivy/trivy-find.ts --report "${{ env.TRIVY_JSON_REPORT }}" --vulnerabilities "${{ inputs.vulnerabilities }}"
       
