@@ -1,5 +1,5 @@
-name: Run Trivy scan on temporary image generated with apk upgrade
-
+name: Run Trivy scan on temporary image generated after running apk upgrade on base Alpine image
+# since apk is Alpine specific package manager, the pipeline is designed specifically for alpine based images
 on:
   workflow_dispatch:
     inputs:

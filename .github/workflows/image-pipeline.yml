@@ -93,6 +93,12 @@ jobs:
         with:
           sarif_file: ${{env.TRIVY_FILESYS_SARIF_REPORT}}
           category: trivy-fs
+      - name: Upload Trivy filesystem report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-fs-report
+          path: ${{env.TRIVY_FILESYS_SARIF_REPORT}}
 
   build-and-push:
     runs-on: ubuntu-latest
@@ -162,16 +168,21 @@ jobs:
           trivy convert --format sarif --output "${{ env.TRIVY_SARIF }}" "${{ env.TRIVY_JSON }}"
       - name: Upload Trivy ${{ matrix.component }} scan results
         uses: github/codeql-action/upload-sarif@v4
-        if: ${{ !cancelled() }}
         with:
           sarif_file: ${{ env.TRIVY_SARIF }}
           category: trivy-${{ matrix.component }}-image-scan
+      
+      - name: Upload Trivy ${{ matrix.component }} json report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-${{ matrix.component }}-json-report
+          path: "${{ env.TRIVY_JSON }}"
 
       - name: Evaluate Trivy reports
         run: |
           deno run --allow-read="${{ env.TRIVY_JSON }}",".github/workflows/trivy/trivyignore.yaml"  \
           .github/workflows/trivy/trivy-gate.ts --trivyreport "${{ env.TRIVY_JSON }}" \
-          -- base_image "${{  matrix.base_image }}" --registry "${{  matrix.registry }}" 
+          --base_image "${{  matrix.base_image }}" --registry "${{  matrix.registry }}" 
 
       - name: Log in to GHCR
         if: ${{ inputs.publish_images }}
