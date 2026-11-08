@@ -106,7 +106,7 @@ jobs:
           category: trivy-fs
       - name: Upload Trivy filesystem report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trivy-fs-report
           path: ${{env.TRIVY_FILESYS_SARIF_REPORT}}
@@ -184,7 +184,7 @@ jobs:
           category: trivy-${{ matrix.component }}-image-scan
       
       - name: Upload Trivy ${{ matrix.component }} json report as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trivy-${{ matrix.component }}-json-report
           path: "${{ env.TRIVY_JSON }}"
