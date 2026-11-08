@@ -1,8 +1,6 @@
 name: Image Pipeline
 
 on:
-  workflow_dispatch:
-# on:
 #  workflow_call:
 #    inputs:
 #      git_ref:
@@ -14,6 +12,17 @@ on:
 #      publish_images:
 #        required: true
 #        type: boolean
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        required: true
+        type: string
+      image_version:
+        required: true
+        type: string
+      publish_images:
+        required: true
+        type: boolean
 
 env:
   REGISTRY: ghcr.io
@@ -25,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        # lets the calling pipeline pick which ref to build
         with:
           ref: ${{ inputs.git_ref }}
       - uses: actions/setup-go@v5
@@ -51,7 +61,10 @@ jobs:
         run: npm test -- --watch=false
 
   trivy-fs-scan:
+    env:
+      TRIVY_FILESYS_SARIF_REPORT: trivy-fs-results.sarif
     runs-on: ubuntu-latest
+    # only if both jobs succeed
     needs: [test-backend, test-frontend]
     permissions:
       contents: read
@@ -70,20 +83,16 @@ jobs:
           scan-ref: .
           severity: HIGH,CRITICAL
           format: sarif
-          output: trivy-fs-results.sarif
-          exit-code: 0
+          output: ${{env.TRIVY_FILESYS_SARIF_REPORT}}
+          exit-code: 1
       - name: Upload Trivy fs scan results
+        # run even when the scan step failed on findings; the job still ends red
+        # will only be skipped if the workflow is cancelled
+        if: ${{ !cancelled() }}
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-fs-results.sarif
+          sarif_file: ${{env.TRIVY_FILESYS_SARIF_REPORT}}
           category: trivy-fs
-      - name: Fail if vulnerabilities found
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          severity: HIGH,CRITICAL
-          exit-code: 1
 
   build-and-push:
     runs-on: ubuntu-latest
@@ -92,107 +101,77 @@ jobs:
       contents: read
       packages: write
       security-events: write
-    env: 
-      TRIVY_BACKEND_FIXED: trivy-backend-results-fixed.sarif
-      TRIVY_BACKEND_UNFIXED: trivy-backend-results-unfixed.sarif
-      TRIVY_FRONTEND_FIXED: trivy-frontend-results-fixed.sarif
-      TRIVY_FRONTEND_UNFIXED: trivy-frontend-results-unfixed.sarif
-      FRONTEND_BASE_IMAGE: nginxinc/nginx-unprivileged:stable-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
-      BACKEND_BASE_IMAGE: gcr.io/distroless/static-debian12@sha256:6d635b323e6ab633016668144d38e368e2894bd824500369151573225078ee03
-      FRONTEND_REGISTRY: https://hub.docker.com/v2/namespaces
-      BACKEND_REGISTRY: https://gcr.io/v2/distroless
+    # one job per image; each leg builds, scans, uploads and pushes its own component
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: backend
+            base_image: gcr.io/distroless/static-debian12@sha256:6d635b323e6ab633016668144d38e368e2894bd824500369151573225078ee03
+            registry: https://hub.docker.com/v2/namespaces
+          - component: frontend
+            base_image: nginxinc/nginx-unprivileged:stable-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
+            registry: https://gcr.io/v2/distroless
+    env:
+      COMPONENT: ${{ matrix.component }}
+      LOCAL_IMAGE: labs-${{ matrix.component }}:ci
+      TRIVY_SARIF: trivy-${{ matrix.component }}-results.sarif
+      TRIVY_JSON: trivy-${{ matrix.component }}-results.json
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          # latest available stable Deno 2.x release
+          deno-version: v2.x
+          cache: true
 
       - name: Set image names and tags
         run: |
-          echo "BACKEND_IMAGE=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/labs-backend" >> "$GITHUB_ENV"
-          echo "FRONTEND_IMAGE=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/labs-frontend" >> "$GITHUB_ENV"
+          echo "IMAGE=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/labs-$COMPONENT" >> "$GITHUB_ENV"
           echo "IMAGE_VERSION=${{ inputs.image_version }}" >> "$GITHUB_ENV"
           echo "COMMIT_TAG=sha-$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
-          echo "BACKEND_LOCAL_IMAGE=labs-backend:ci" >> "$GITHUB_ENV"
-          echo "FRONTEND_LOCAL_IMAGE=labs-frontend:ci" >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build backend image
+      - name: Build ${{ matrix.component }} image
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
-          tags: ${{ env.BACKEND_LOCAL_IMAGE }}
+          context: ./${{ matrix.component }}
+          tags: ${{ env.LOCAL_IMAGE }}
           load: true
           # GitHub Actions cache backend (type=gha) persists BuildKit layer
           # cache across separate CI and release runs on ephemeral runners.
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
           build-args: |
-            BASE_IMAGE=${{ env.BACKEND_BASE_IMAGE }}
-      - name: Build frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          tags: ${{ env.FRONTEND_LOCAL_IMAGE }}
-          load: true
-          cache-from: type=gha,scope=frontend
-          cache-to: type=gha,mode=max,scope=frontend
-          build-args: |
-            BASE_IMAGE=${{ env.FRONTEND_BASE_IMAGE }}
-      # Only report vulnerabilities for which a fix is available
-      - name: Trivy scan backend image for CVEs with fixes
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: ${{ env.BACKEND_LOCAL_IMAGE }}
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          format: sarif
-          output: ${{ env.TRIVY_BACKEND_FIXED }}
-          exit-code: 1
-      - name: Upload Trivy backend scan results
+            BASE_IMAGE=${{ matrix.base_image }}
+      - name: Set up Trivy CLI
+        uses: aquasecurity/setup-trivy@v0.3.1
+      # trivy-action supports one output format per run, so scan once to JSON
+      # and convert that report to SARIF (no second scan).
+      - name: Trivy scan ${{ matrix.component }} image for CVEs with fixes
+        run: |
+          trivy image "$LOCAL_IMAGE" \
+            --severity HIGH,CRITICAL \
+            --format json --output "${{ env.TRIVY_JSON }}" \
+            --exit-code 0
+          trivy convert --format sarif --output "${{ env.TRIVY_SARIF }}" "${{ env.TRIVY_JSON }}"
+      - name: Upload Trivy ${{ matrix.component }} scan results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: ${{ !cancelled() }}
         with:
-          sarif_file: ${{ env.TRIVY_BACKEND_FIXED }}
-          category: trivy-backend-fixed
-      # Report all vulnerabilities but those with fixes should be already filtered out by previous step
-      # so effectively - this is policy for CVEs that do not have fix yet
-      - name: Trivy scan backend image for CVEs with and without fixes
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: ${{ env.BACKEND_LOCAL_IMAGE }}
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          format: sarif
-          output: ${{ env.TRIVY_BACKEND_UNFIXED }}
-          exit-code: 1
-      - name: Upload Trivy backend scan results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: ${{ env.TRIVY_BACKEND_UNFIXED }}
-          category: trivy-backend-unfixed
-      - name: Trivy scan frontend image
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: ${{ env.FRONTEND_LOCAL_IMAGE }}
-          severity: HIGH,CRITICAL
-          format: sarif
-          output: trivy-frontend-results.sarif
-          exit-code: 0
-          ignore-unfixed: true
-      - name: Upload Trivy frontend scan results
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-frontend-results.sarif
-          category: trivy-frontend
-      - name: Fail if frontend image has vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: ${{ env.FRONTEND_LOCAL_IMAGE }}
-          severity: HIGH,CRITICAL
-          exit-code: 1
+          sarif_file: ${{ env.TRIVY_SARIF }}
+          category: trivy-${{ matrix.component }}-image-scan
+
+      - name: Evaluate Trivy reports
+        run: |
+          deno run --allow-read="${{ env.TRIVY_JSON }}",".github/workflows/trivy/trivyignore.yaml"  
+          .github/workflows/trivy/trivy-gate.ts --trivyreport "${{ env.TRIVY_JSON }}" 
+          -- base_image "${{  matrix.base_image }}" --registry "${{  matrix.registry }}"
 
       - name: Log in to GHCR
         if: ${{ inputs.publish_images }}
@@ -202,18 +181,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Tag and push backend image
+      - name: Tag and push ${{ matrix.component }} image
         if: ${{ inputs.publish_images }}
         run: |
-          docker tag "$BACKEND_LOCAL_IMAGE" "$BACKEND_IMAGE:$IMAGE_VERSION"
-          docker tag "$BACKEND_LOCAL_IMAGE" "$BACKEND_IMAGE:$COMMIT_TAG"
-          docker push "$BACKEND_IMAGE:$IMAGE_VERSION"
-          docker push "$BACKEND_IMAGE:$COMMIT_TAG"
-
-      - name: Tag and push frontend image
-        if: ${{ inputs.publish_images }}
-        run: |
-          docker tag "$FRONTEND_LOCAL_IMAGE" "$FRONTEND_IMAGE:$IMAGE_VERSION"
-          docker tag "$FRONTEND_LOCAL_IMAGE" "$FRONTEND_IMAGE:$COMMIT_TAG"
-          docker push "$FRONTEND_IMAGE:$IMAGE_VERSION"
-          docker push "$FRONTEND_IMAGE:$COMMIT_TAG"
+          docker tag "$LOCAL_IMAGE" "$IMAGE:$IMAGE_VERSION"
+          docker tag "$LOCAL_IMAGE" "$IMAGE:$COMMIT_TAG"
+          docker push "$IMAGE:$IMAGE_VERSION"
+          docker push "$IMAGE:$COMMIT_TAG"

@@ -77,11 +77,11 @@ async function analyzeCVE(cve: Vulnerability): Promise<CveEvalResult> {
     // FixedVersion exists - check latest base image digest
     // if there is a new digest (a newer version has been pushed) - it might contain the CVE fix
     const latestDigest = await getLatestBaseImageDigest();
-    const currentDigest = String(args.BASE_IMAGE).split("@")[1];
+    const currentDigest = String(args.base_image).split("@")[1];
 
     // there is a newer digest; we are using an older one
     if (latestDigest !== currentDigest) {
-      const latestImageWithDigest: string = String(args.BASE_IMAGE).replace(
+      const latestImageWithDigest: string = String(args.base_image).replace(
         currentDigest,
         latestDigest,
       );
@@ -98,10 +98,8 @@ async function analyzeLatestDigest(
   latestImageWithDigest: string,
   cve: Vulnerability,
 ): Promise<CveEvalResult> {
-  const fixedInLatestDigest: boolean = await cveFixed(
-    latestImageWithDigest,
-    cve,
-  );
+
+  const fixedInLatestDigest: boolean = await cveFixed( latestImageWithDigest, cve);
 
   //CVE fixed in latest digest
   if (fixedInLatestDigest) {
@@ -210,7 +208,7 @@ async function getLatestBaseImageDigest(): Promise<string> {
   const raw = await response.json();
   console.log(`API response: ${raw}`);
   const args = parseArgs(Deno.args);
-  const registry = args.REGISTRY;
+  const registry = args.registry;
 
   if (dockerhub(registry)) {
     return getDockerhubImageDigest(raw);
@@ -255,14 +253,14 @@ function getRegistryUrl(): string {
   const args = parseArgs(Deno.args);
 
   //nginxinc/nginx-unprivileged:stable-alpine3.24@shafff
-  const imageWithDigest = args.BASE_IMAGE;
+  const imageWithDigest = args.base_image;
 
   //nginxinc/nginx-unprivileged:stable-alpine3.24
   const base = imageWithDigest.split("@")[0];
 
   // https://hub.docker.com/v2/namespaces
   // https://gcr.io/v2/distroless
-  const registry = args.REGISTRY;
+  const registry = args.registry;
 
   if (dockerhub(registry)) {
     //nginxinc
@@ -290,7 +288,7 @@ function getRegistryUrl(): string {
     return url;
   }
 
-  throw error(`Unknown Registry ${args.REGISTRY}`);
+  throw error(`Unknown Registry ${registry}`);
 }
 
 function dockerhub(registry: string): boolean {
