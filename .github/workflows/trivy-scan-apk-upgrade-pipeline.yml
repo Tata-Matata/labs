@@ -44,5 +44,6 @@ jobs:
         deno-version: v2.x
         cache: true
     - name: Check certain CVEs in Trivy report
-      run: deno run --allow-read="$TRIVY_JSON_REPORT" ./trivy/trivy-find.ts --report "$TRIVY_JSON_REPORT" --vulnerabilities "${{ inputs.vulnerabilities }}"
+      working-directory: .github/workflows/trivy
+      run: deno run --allow-read=${{ env.TRIVY_JSON_REPORT }} trivy-find.ts --report "${{ env.TRIVY_JSON_REPORT }}" --vulnerabilities "${{ inputs.vulnerabilities }}"
       
