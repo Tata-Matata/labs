@@ -4,6 +4,8 @@ import { parseReport } from "./trivy-parse-report.ts";
 import {
   type CveIgnoreEntry,
   CveIgnoreEntrySchema,
+  CveIgnoreFile,
+  CveIgnoreSchema,
   type DockerhubImage,
   DockerhubSchema,
   type GcrIoImage,
@@ -380,10 +382,8 @@ async function parseTrivyIgnore(): Promise<CveIgnoreEntry[]> {
   );
 
   const content = await Deno.readTextFile(filePath);
-
-  const cveIgnores: CveIgnoreEntry[] = CveIgnoreEntrySchema.array().parse(
-    parse(content),
-  );
+  const ignoreFile: CveIgnoreFile = CveIgnoreSchema.parse(parse(content))
+  const cveIgnores: CveIgnoreEntry[] = ignoreFile.vulnerabilities
 
   console.log(`List of ignored CVEs from ${filePath}: ${cveIgnores}`);
 

@@ -15,6 +15,9 @@ export const CveIgnoreEntrySchema = z.object({
   statement: z.string(),
 });
 
+export const CveIgnoreSchema = z.object({
+  vulnerabilities: z.array(CveIgnoreEntrySchema),
+});
 
 export const TrivyResultSchema = z.object({
   Target: z.string(),
@@ -57,3 +60,4 @@ export type Vulnerability = z.infer<typeof VulnerabilitySchema>;
 export type TrivyResult = z.infer<typeof TrivyResultSchema>;
 export type TrivyReport = z.infer<typeof TrivyReportSchema>;
 export type CveIgnoreEntry = z.infer<typeof CveIgnoreEntrySchema>;
+export type CveIgnoreFile = z.infer<typeof CveIgnoreSchema>;
