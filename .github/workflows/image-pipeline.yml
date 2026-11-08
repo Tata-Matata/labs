@@ -89,7 +89,7 @@ jobs:
         # run even when the scan step failed on findings; the job still ends red
         # will only be skipped if the workflow is cancelled
         if: ${{ !cancelled() }}
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ${{env.TRIVY_FILESYS_SARIF_REPORT}}
           category: trivy-fs
@@ -161,7 +161,7 @@ jobs:
             --exit-code 0
           trivy convert --format sarif --output "${{ env.TRIVY_SARIF }}" "${{ env.TRIVY_JSON }}"
       - name: Upload Trivy ${{ matrix.component }} scan results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: ${{ !cancelled() }}
         with:
           sarif_file: ${{ env.TRIVY_SARIF }}
@@ -169,9 +169,9 @@ jobs:
 
       - name: Evaluate Trivy reports
         run: |
-          deno run --allow-read="${{ env.TRIVY_JSON }}",".github/workflows/trivy/trivyignore.yaml"  
-          .github/workflows/trivy/trivy-gate.ts --trivyreport "${{ env.TRIVY_JSON }}" 
-          -- base_image "${{  matrix.base_image }}" --registry "${{  matrix.registry }}"
+          deno run --allow-read="${{ env.TRIVY_JSON }}",".github/workflows/trivy/trivyignore.yaml"  \
+          .github/workflows/trivy/trivy-gate.ts --trivyreport "${{ env.TRIVY_JSON }}" \
+          -- base_image "${{  matrix.base_image }}" --registry "${{  matrix.registry }}" 
 
       - name: Log in to GHCR
         if: ${{ inputs.publish_images }}
