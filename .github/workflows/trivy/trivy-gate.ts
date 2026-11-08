@@ -40,7 +40,7 @@ try {
     console.log(`No action needed on found CVEs`);
     Deno.exit(0);
   } else {
-    console.log(`Found CVEs that require manual intervention: ${failures}`);
+    console.log(`Found CVEs that require manual intervention: :\n${JSON.stringify(failures, null, 2)}`);
     Deno.exit(1);
   }
 } catch (error) {
@@ -61,6 +61,7 @@ async function analyzeCVEs(
     const result: CveEvalResult = await analyzeCVE(cve);
 
     console.log(`Result: ${JSON.stringify(result, null, 2)}`);
+    console.log(`==========================================================`)
 
     results.push(result);
   }
@@ -107,10 +108,10 @@ async function analyzeLatestDigest(
 
   //CVE fixed in latest digest
   if (fixedInLatestDigest) {
+    const message: string = `Update base image to the latest digest ${latestImageWithDigest}. The CVE ${cve.VulnerabilityID} is fixed there`
     return {
       cve: cve.VulnerabilityID,
-      error:
-        `Update base image to the latest digest ${latestImageWithDigest}. The CVE ${cve.VulnerabilityID} is fixed there`,
+      error: message
     };
   }
 
@@ -120,7 +121,7 @@ async function analyzeLatestDigest(
   const checkIgnoreList = await checkCveInIgnoreList(cve);
   if (checkIgnoreList.error == null) {
     console.log(
-      `CVE ${cve.VulnerabilityID} is in ignore list. We are not using the newest digest, but it does not contain DVE fix yet`,
+      `CVE ${cve.VulnerabilityID} is in ignore list. We are not using the newest digest, but the newest digest does not contain CVE fix yet`,
     );
     return checkIgnoreList;
   }
@@ -131,8 +132,7 @@ async function analyzeLatestDigest(
   return {
     cve: cve.VulnerabilityID,
     error:
-      `The CVE ${cve.VulnerabilityID} is not fixed in latest image digest, and it can't be fixed by apk upgrade.
-    Consider adding it to ignore list or testing apk upgrade using separate pipeline`,
+      `The CVE ${cve.VulnerabilityID} is not fixed in latest image digest. Consider adding it to ignore list or testing apk upgrade if base is alpine using separate pipeline`,
   };
 }
 
@@ -356,6 +356,7 @@ function cveInIgnoreList(
   cve: Vulnerability,
   ignoreList: CveIgnoreEntry[],
 ): CveIgnoreEntry | null {
+
   for (const ignore of ignoreList) {
     if (ignore.id === cve.VulnerabilityID) {
       console.log(
@@ -385,7 +386,7 @@ async function parseTrivyIgnore(): Promise<CveIgnoreEntry[]> {
   const ignoreFile: CveIgnoreFile = CveIgnoreSchema.parse(parse(content))
   const cveIgnores: CveIgnoreEntry[] = ignoreFile.vulnerabilities
 
-  console.log(`List of ignored CVEs from ${filePath}: ${cveIgnores}`);
+  console.log(`List of ignored CVEs from ${filePath}:\n${JSON.stringify(cveIgnores, null, 2)}`);
 
   return cveIgnores ?? [];
 }
