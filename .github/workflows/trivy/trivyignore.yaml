@@ -4,7 +4,7 @@ vulnerabilities:
   - id: CVE-2026-111497
     purls:
       - "pkg:apk/alpine/brotli"
-    expired_at: "2026-10-15"
+    expired_at: "2026-10-15T00:00:00Z"
     statement: >
       Dummy example.
 
