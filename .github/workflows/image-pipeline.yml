@@ -163,6 +163,7 @@ jobs:
         run: |
           trivy image "$LOCAL_IMAGE" \
             --severity HIGH,CRITICAL \
+            --ignorefile .github/workflows/trivy/trivyignore.yaml \
             --format json --output "${{ env.TRIVY_JSON }}" \
             --exit-code 0
           trivy convert --format sarif --output "${{ env.TRIVY_SARIF }}" "${{ env.TRIVY_JSON }}"
