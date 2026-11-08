@@ -180,7 +180,7 @@ jobs:
 
       - name: Evaluate Trivy reports
         run: |
-          deno run --allow-read="${{ env.TRIVY_JSON }}",".github/workflows/trivy/trivyignore.yaml"  \
+          deno run --allow-read="${{ env.TRIVY_JSON }}",".github/workflows/trivy/trivyignore.yaml"  --allow-net \
           .github/workflows/trivy/trivy-gate.ts --trivyreport "${{ env.TRIVY_JSON }}" \
           --base_image "${{  matrix.base_image }}" --registry "${{  matrix.registry }}" 
 
