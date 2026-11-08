@@ -1,18 +1,7 @@
 name: Image Pipeline
 
 on:
-#  workflow_call:
-#    inputs:
-#      git_ref:
-#        required: true
-#        type: string
-#      image_version:
-#        required: true
-#        type: string
-#      publish_images:
-#        required: true
-#        type: boolean
-  workflow_dispatch:
+  workflow_call:
     inputs:
       git_ref:
         required: true
