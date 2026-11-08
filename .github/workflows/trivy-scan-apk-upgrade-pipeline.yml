@@ -39,6 +39,11 @@ jobs:
         exit-code: 0
         scan-type: image
         output: ${{ env.TRIVY_JSON_REPORT }}
+    - name: Upload Trivy report
+      uses: actions/upload-artifact@v4
+      with:
+        name: trivy-report
+        path: ${{ env.TRIVY_JSON_REPORT }}
     - name: Install Deno
       uses: denoland/setup-deno@v2
       with:
