@@ -37,6 +37,12 @@ jobs:
         exit-code: 0
         scan-type: image
         output: ${{ env.TRIVY_JSON_REPORT }}
+    - name: Install Deno
+      uses: denoland/setup-deno@v2
+      with:
+        # latest available stable Deno 2.x release
+        deno-version: v2.x
+        cache: true
     - name: Check certain CVEs in Trivy report
       run: deno run --allow-read="$TRIVY_JSON_REPORT" ./trivy/trivy-find.ts --report "$TRIVY_JSON_REPORT" --vulnerabilities "${{ inputs.vulnerabilities }}"
       
