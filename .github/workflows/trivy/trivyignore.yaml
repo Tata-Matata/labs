@@ -4,13 +4,13 @@ vulnerabilities:
   - id: CVE-2026-111497
     purls:
       - "pkg:apk/alpine/brotli"
-    expired_at: 2026-12-31
+    expired_at: "2026-12-31"
     statement: >
       No fixed version is currently available in the selected Alpine
       repository. Re-evaluate when the Alpine package is updated.
 
   # Another accepted risk
   - id: CVE-2026-123456
-    expired_at: 2026-12-15
+    expired_at: "2026-12-15"
     statement: >
       Vulnerability is not exploitable in our application context.
