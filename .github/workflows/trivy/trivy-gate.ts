@@ -86,10 +86,10 @@ async function analyzeCVE(cve: Vulnerability): Promise<CveEvalResult> {
         latestDigest,
       );
       return analyzeLatestDigest(latestImageWithDigest, cve);
-    } 
+    }
   }
 
-  // there is no FixedVersion yet or 
+  // there is no FixedVersion yet or
   // we are already using the latest digest in the pipeline and CVE is not fixed there
   return await checkCveInIgnoreList(cve);
 }
@@ -98,8 +98,10 @@ async function analyzeLatestDigest(
   latestImageWithDigest: string,
   cve: Vulnerability,
 ): Promise<CveEvalResult> {
-
-  const fixedInLatestDigest: boolean = await cveFixed( latestImageWithDigest, cve);
+  const fixedInLatestDigest: boolean = await cveFixed(
+    latestImageWithDigest,
+    cve,
+  );
 
   //CVE fixed in latest digest
   if (fixedInLatestDigest) {
@@ -168,6 +170,8 @@ async function runTrivyScan(image: string): Promise<Vulnerability[]> {
       "json",
       "--exit-code",
       "0",
+      "--severity",
+      "HIGH,CRITICAL",
       image,
     ],
     stdout: "piped",
@@ -302,9 +306,7 @@ function gcr(registry: string): boolean {
 async function checkCveInIgnoreList(
   cve: Vulnerability,
 ): Promise<CveEvalResult> {
-  const cveIgnores: CveIgnoreEntry[] = await parseTrivyIgnore(
-    "trivyignore.yaml",
-  );
+  const cveIgnores: CveIgnoreEntry[] = await parseTrivyIgnore();
   const cveIgnoreEntry: CveIgnoreEntry | null = cveInIgnoreList(
     cve,
     cveIgnores,
@@ -364,7 +366,19 @@ function cveInIgnoreList(
 
   return null;
 }
-async function parseTrivyIgnore(filePath: string): Promise<CveIgnoreEntry[]> {
+async function parseTrivyIgnore(): Promise<CveIgnoreEntry[]> {
+
+  //import.meta.url is a built-in JavaScript/TypeScript property 
+  // that returns the URL of the currently executing module.
+  // file:///home/runner/work/my-repo/my-repo/.github/workflows/trivy/trivy-gate.ts
+  console.log(import.meta.url);
+
+  //import.meta.url resolves the relative path against the URL of this script trivy-gate.ts
+  const filePath = new URL(
+    "./trivyignore.yaml",
+    import.meta.url,
+  );
+
   const content = await Deno.readTextFile(filePath);
 
   const cveIgnores: CveIgnoreEntry[] = CveIgnoreEntrySchema.array().parse(
@@ -375,4 +389,3 @@ async function parseTrivyIgnore(filePath: string): Promise<CveIgnoreEntry[]> {
 
   return cveIgnores ?? [];
 }
-
