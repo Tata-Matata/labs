@@ -334,14 +334,11 @@ async function checkCveInIgnoreList(
 }
 
 function cveIgnoreExpired(cveIgnore: CveIgnoreEntry): boolean {
-  const [year, month, day] = cveIgnore.expired_at.split("-").map(Number);
-  //JS uses 0 based months
-  const expiredAt = new Date(year, month - 1, day);
+  // expired_at is RFC3339 (e.g. 2026-10-15T00:00:00Z), the format Trivy requires in its ignore file
+  const expiredAt = new Date(cveIgnore.expired_at);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  if (expiredAt > today) {
+  // an unparsable date is treated as expired
+  if (expiredAt > new Date()) {
     console.log(
       `CVE ignore ${cveIgnore.id} is still valid, expires ${cveIgnore.expired_at}`,
     );
