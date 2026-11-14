@@ -10,7 +10,31 @@ on:
     paths-ignore: *docs
 
 jobs:
+  # A push to a branch with an open PR is covered by the pull_request run
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        name: Run pipeline only if push to main or to feature branch without corresponding PR open
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          run=true
+          if [ "$EVENT" = "push" ] && [ "$BRANCH" != "main" ]; then
+            open=$(gh api "repos/${{ github.repository }}/pulls?state=open&head=${{ github.repository_owner }}:$BRANCH" --jq length)
+            if [ "$open" -gt 0 ]; then run=false; fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
   pipeline:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     uses: ./.github/workflows/image-pipeline.yml
     permissions:
       contents: read
