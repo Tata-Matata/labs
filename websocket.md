@@ -1,3 +1,5 @@
+### Websocket on frontend side
+
 In `terminal.component.ts`
 
 ```typescript
@@ -6,11 +8,7 @@ private connect(): void {
 }
 ```
 
-### **So what is happening at this point?**
-
-Angular is already running in the browser. The application was downloaded from Nginx earlier. Now this code executes inside the browser.
-
-Suppose `buildSocketUrl()` produces:
+This code executes inside the browser. Suppose `buildSocketUrl()` produces:
 
 ```text
 wss://labs.example.com/api/terminal
@@ -18,7 +16,7 @@ wss://labs.example.com/api/terminal
 
 The browser now starts establishing a **WebSocket connection to Nginx**.
 
-An important detail in this architecture is that there are actually **two network connections**:
+There are actually **two network connections**:
 
 ```text
 Browser                 Nginx                  Go backend
@@ -28,13 +26,13 @@ Browser                 Nginx                  Go backend
    │                       │                       │
 ```
 
-Nginx is a reverse proxy, so it does not simply hand the browser's connection over to Go. Nginx terminates the connection from the browser and creates/maintains a separate connection to the Go backend.
+Nginx is a **reverse proxy**, so it does not simply hand the browser's connection over to Go. Nginx terminates the connection from the browser and creates/maintains a separate connection to the Go backend.
 
 Therefore, the WebSocket upgrade happens on **both connections**.
 
 ---
 
-## **WebSocket handshake**
+#### **WebSocket handshake**
 
 The browser's connection to Nginx initially starts as HTTP.
 
@@ -60,9 +58,9 @@ They mean:
 
 > "I would like to upgrade this HTTP connection to a WebSocket connection."
 
-If Nginx accepts the request, it needs to establish the corresponding WebSocket connection to the Go backend.
+## WebSocket to backend
 
-This is why Nginx must be configured to proxy the WebSocket upgrade:
+If Nginx accepts the request, it needs to establish the corresponding WebSocket connection to the Go backend. This is why Nginx must be configured to proxy the WebSocket upgrade:
 
 ```nginx
 location /api/terminal {
@@ -76,7 +74,6 @@ location /api/terminal {
 
 Nginx therefore sends a corresponding upgrade request to Go.
 
-Conceptually:
 
 ```text
 Browser                         Nginx                         Go
@@ -90,9 +87,9 @@ Browser                         Nginx                         Go
    │                              │                    upgrader.Upgrade()
    │                              │                            │
    │                              │<───────────────────────────│
-   │                              │   101 Switching Protocols  │
+   │                              │       Switching Protocols  │
    │<─────────────────────────────│                            │
-   │   101 Switching Protocols    │                            │
+   │       Switching Protocols    │                            │
 ```
 
 So there are **two separate upgrade operations**:
@@ -117,8 +114,6 @@ The Go backend therefore still needs to call:
 ```go
 conn, err := s.upgrader.Upgrade(w, r, nil)
 ```
-
-This does **not** mean that Go is upgrading the browser's connection again.
 
 Go is upgrading the **separate Nginx → Go connection**.
 
@@ -338,9 +333,7 @@ this.socket.addEventListener('message', (event) => {
 
 # **What Nginx actually does**
 
-Nginx is not interpreting the terminal messages.
-
-It mainly provides the connection between the browser and the Go backend:
+Nginx is not interpreting the terminal messages. It mainly provides the connection between the browser and the Go backend:
 
 ```text
                     WebSocket connection #1
@@ -389,10 +382,6 @@ Nginx simply proxies it back to the browser.
 
 # **WebSocket vs normal HTTP flow**
 
-The WebSocket is **not** used to load the Angular application.
-
-We have two separate kinds of communication.
-
 ### 1. Application loading
 
 ```text
@@ -438,28 +427,3 @@ Browser ══ WebSocket ══> Nginx ══ WebSocket ══> Go
 Browser <═ WebSocket ═══ Nginx <═ WebSocket ═══ Go
 ```
 
-There are therefore **two WebSocket connections**, one on each side of Nginx:
-
-```text
-Browser
-   │
-   │ WebSocket connection #1
-   ▼
- Nginx
-   │
-   │ WebSocket connection #2
-   ▼
- Go backend
-```
-
-Nginx proxies WebSocket frames between them.
-
-The result is a **long-lived, bidirectional communication channel** from the application's perspective:
-
-```text
-Angular ←──────────────────────────────→ Go
-                 Nginx
-              in the middle
-```
-
-This allows terminal input to travel from Angular to the PTY and terminal output to travel back from the PTY to Angular without creating a new HTTP request for every piece of terminal data.

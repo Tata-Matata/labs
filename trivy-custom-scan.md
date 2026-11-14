@@ -1,0 +1,314 @@
+# Trivy Custom Scan Logic
+
+This document describes the logic behind the custom Trivy scanning system in `.github/workflows/trivy/`, which extends the standard Trivy container image vulnerability scanning with custom decision making and CVE management.
+
+## Overview
+
+The **CVE gate** decides whether vulnerabilities found during Trivy image scans should block the pipeline or can be safely ignored. It automatically checks for available fixes and enforces manual review through an ignore list with expiration dates.
+
+## Architecture
+
+### Components
+
+1. **trivy-gate.ts** — Main entry point that orchestrates vulnerability analysis and decision-making
+2. **trivy-parse-report.ts** — Parses Trivy JSON reports and extracts vulnerabilities
+3. **trivy-find.ts** — Utility script to search for specific CVEs in a Trivy report
+4. **schemas.ts** — Zod schema definitions for runtime and compile-time type checking
+5. **trivyignore.yaml** — Configuration file containing ignored CVEs with expiration dates
+
+## Workflow Logic
+
+### Entry Point: trivy-gate.ts
+
+The main script receives command-line arguments:
+- `--trivyreport`: Path to the Trivy JSON report file
+- `--base_image`: Full Docker image reference with digest (e.g., `nginxinc/nginx-unprivileged:stable-alpine3.24@sha256:abc123`)
+- `--registry`: Registry URL (e.g., `https://hub.docker.com/v2`, `https://gcr.io/v2`)
+
+**Main execution flow:**
+
+```
+1. Parse Trivy report JSON
+2. Extract vulnerabilities with HIGH or CRITICAL severity
+3. If no vulnerabilities found → EXIT 0 (success)
+4. For each vulnerability → analyze it
+5. Collect results
+6. If any analysis failed → EXIT 1 (block pipeline)
+7. Otherwise → EXIT 0 (allow pipeline)
+```
+
+### CVE Analysis Decision Tree
+
+For each vulnerability, the system applies the following logic:
+
+```
+┌─────────────────────────────────────┐
+│  Vulnerability Found in Report      │
+└────────┬────────────────────────────┘
+         │
+         ├─ Does FixedVersion exist?
+         │   ├─ NO → Check Ignore List (A)
+         │   └─ YES → Compare Image Digest
+         │
+         ├─ Is current digest outdated?
+         │   ├─ NO → Check Ignore List (A)
+         │   └─ YES → Scan Latest Digest
+         │
+         ├─ Is CVE fixed in latest?
+         │   ├─ YES → Report upgrade needed (B)
+         │   └─ NO → Check Ignore List (A)
+         │
+┌────────────────────────────────────┐
+│(A) Check Ignore List               │
+├────────────────────────────────────┤
+│ ├─ Is CVE in ignore list?          │
+│ │   ├─ NO → Fail: needs review (C) │
+│ │   └─ YES → Check expiration      │
+│ │       ├─ Expired → Fail (C)      │
+│ │       └─ Valid → Pass (D)        │
+└────────────────────────────────────┘
+```
+
+**Legend:**
+- **(B) Upgrade Required**: CVE has a fix and latest digest available. Action: Update base image.
+- **(C) Manual Review Needed**: CVE requires human decision. Actions: add to ignore list or fix in upstream.
+- **(D) Approved Vulnerability**: CVE is documented in ignore list with valid expiration. Proceed.
+
+### Detailed Analysis Steps
+
+#### 1. Check for Available Fix
+
+**Key insight:** Even if a fix exists, it's only useful if the newer version is available and you're not already using it.
+
+#### 2. Scan Latest Image Digest
+
+When a newer digest is available:
+
+1. Run `trivy image` command on the newer digest
+2. Parse the resulting vulnerability list
+3. Check if the current CVE is absent (meaning it's fixed)
+
+#### 3. Registry API Integration
+
+The system queries container registries to find the latest digest of the base image:
+
+**Docker Hub:**
+```typescript
+// URL: https://hub.docker.com/v2/namespaces/{namespace}/repositories/{repo}/tags/{tag}
+// Example: https://hub.docker.com/v2/namespaces/nginxinc/repositories/nginx-unprivileged/tags/stable-alpine3.24
+// Response contains: { images: [{ architecture: "amd64", digest: "sha256:..." }] }
+```
+
+**Google Container Registry (gcr.io):**
+```typescript
+// URL: https://gcr.io/v2/{image}/manifests/latest
+// Example: https://gcr.io/v2/distroless/static-debian12/manifests/latest
+// Response contains: { manifests: [{ platform: { architecture: "amd64" }, digest: "sha256:..." }] }
+```
+
+
+### Ignore List Management (trivyignore.yaml)
+
+```yaml
+vulnerabilities:
+  - id: CVE-2026-111497
+    purls:
+      - "pkg:apk/alpine/brotli"
+    expired_at: "2026-10-15T00:00:00Z"
+    statement: >
+      Dummy example. Explain why this CVE is acceptable.
+```
+
+**Fields:**
+- `id`: CVE identifier (e.g., CVE-2026-111497)
+- `purls`: Affected package (purl format from Trivy; currently informational)
+- `expired_at`: RFC3339 timestamp after which the ignore is invalid
+- `statement`: Human-readable justification for the ignore
+
+**When to add entries:**
+- CVE exists in multiple images and can't be fixed immediately
+- Mitigation measures are in place despite the vulnerability
+- Risk assessment determines it's acceptable for now
+- Always set a reasonable expiration date (3-6 months typical)
+
+## Trivy Report Parsing
+
+### Input: Trivy JSON Report
+
+Generated by command:
+```bash
+trivy image --format json --exit-code 0 --severity HIGH,CRITICAL <image>
+```
+
+**Report structure:**
+```json
+{
+  "Results": [
+    {
+      "Target": "nginx:stable-alpine3.24",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-12345",
+          "PkgName": "openssl",
+          "InstalledVersion": "1.1.1w",
+          "FixedVersion": "1.1.1y",
+          "Severity": "HIGH"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Parsing Flow
+
+1. **Load report file** → `trivy-parse-report.ts`
+2. **Parse JSON** → Zod schema validation
+3. **Extract vulnerabilities** → From first `Results[0]` entry
+4. **Filter by severity** → Only HIGH and CRITICAL (others ignored)
+5. **Return array** → For analysis
+
+## Exit Codes
+
+| Exit Code | Meaning | Action |
+|-----------|---------|--------|
+| 0 | All CVEs handled | Pipeline proceeds |
+| 1 | Unhandled CVEs found | Pipeline blocked; manual review needed |
+
+**Unhandled CVEs include:**
+- CVEs not in ignore list
+- Expired ignore entries
+- CVEs not fixed in available patches
+
+## Supporting Scripts
+
+### trivy-find.ts
+
+Utility to search for specific CVEs in a Trivy report:
+
+```bash
+deno run --allow-read trivy-find.ts \
+  --trivyreport trivy-report.json \
+  --vulnerabilities CVE-2024-12345,CVE-2024-67890
+```
+
+**Output:** Lists which CVEs were found in the report.
+
+**Use case:** CI debugging, manual verification of fixes.
+
+## Schema Validation (schemas.ts)
+
+All data is validated at runtime using Zod schemas:
+
+- **VulnerabilitySchema** → CVE data from Trivy report
+- **CveIgnoreEntrySchema** → Single ignore list entry
+- **CveIgnoreSchema** → Entire trivyignore.yaml file
+- **TrivyReportSchema** → Trivy JSON report structure
+- **DockerhubSchema** / **GcrIoSchema** → Registry API responses
+
+**Benefit:** Type-safe and validates unknown/malformed data, with detailed error messages.
+
+## Workflow Integration
+
+### Typical GitHub Actions Usage
+
+```yaml
+- name: Run Trivy image scan
+  run: |
+    trivy image --format json \
+      --severity HIGH,CRITICAL \
+      --exit-code 0 \
+      --output trivy-report.json \
+      nginx:stable-alpine3.24@sha256:abc123
+
+- name: Gate on CVE analysis
+  run: |
+    deno run --allow-run=trivy \
+      --allow-read \
+      --allow-net \
+      .github/workflows/trivy/trivy-gate.ts \
+      --trivyreport trivy-report.json \
+      --base_image "nginx:stable-alpine3.24@sha256:abc123" \
+      --registry "https://hub.docker.com/v2"
+```
+
+## Error Handling
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| Parsing error (Zod) | Malformed JSON or YAML | Check report/config format |
+| File not found | Trivy report missing | Ensure scan completed |
+| Trivy command failed | Registry not accessible | Check network/auth |
+| API request failed | Registry API down | Retry or check credentials |
+| Unknown registry | Registry not supported | Add support for registry type |
+
+## Performance Considerations
+
+**Expensive operations:**
+- `trivy image` scans on latest digest (rebuilds vulnerability DB each time)
+- Registry API calls (network latency)
+
+**Optimization:** Only scans latest digest if FixedVersion exists and current digest is outdated.
+
+## Security Implications
+
+1. **Ignore list enforces review**: CVEs aren't silently ignored; they require documentation and expiration.
+2. **Automated upgrades**: Detects when base image updates fix CVEs automatically.
+3. **Digest pinning**: Using digest references prevents silent base image changes.
+4. **RFC3339 expiration**: Forces periodic re-evaluation of accepted risks.
+
+## Common Scenarios
+
+### Scenario 1: CVE Fixed in Newer Base Image
+
+**Situation:** Alpine package is vulnerable, but a newer version fixes it.
+
+**Flow:**
+1. `FixedVersion` exists
+2. Newer digest available
+3. Scan newer digest → CVE not found
+4. **Result:** "Update base image to [digest]. CVE is fixed there."
+
+**Action:** Update Dockerfile `FROM` directive with new digest.
+
+### Scenario 2: CVE Not Yet Fixed, Must Document It
+
+**Situation:** Vulnerable package, no fix available, but risk is acceptable.
+
+**Flow:**
+1. `FixedVersion` is empty or newer image still has it
+2. Check ignore list → not found
+3. **Result:** "CVE needs manual investigation. Not in ignore list."
+
+**Action:** Add to `trivyignore.yaml` with expiration date and justification.
+
+### Scenario 3: Ignore Entry Expired
+
+**Situation:** CVE was documented but expiration date passed.
+
+**Flow:**
+1. Found in ignore list
+2. Check expiration: `now() > expired_at`
+3. **Result:** "CVE ignore expired; needs review."
+
+**Action:** Update expiration date in ignore list or re-evaluate the CVE.
+
+## Testing
+
+Use `test.json` (sample Trivy report) to validate logic without scanning actual images:
+
+```bash
+deno run --allow-read \
+  .github/workflows/trivy/trivy-parse-report.ts \
+  --trivyreport test.json
+```
+
+## Future Enhancements
+
+Potential improvements:
+- Multi-architecture support (arm64, etc.)
+- Ignore list database integration
+- Slack/email notifications for expired ignores
+- Automatic major version upgrade suggestions
+- Custom severity thresholds
+- SBOM (Software Bill of Materials) generation

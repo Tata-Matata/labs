@@ -3,20 +3,20 @@
 ## Migration to https will break on sameOrigin check in origin.go if there is tls termination on the load balancer
 
 #### Background
-nginx sets X-Forwarded-Proto $scheme. Behind a TLS-terminating ingress or load balancer, $scheme is http, so the backend sees http while the browser's Origin is https://.... The mismatch comes from nginx overwriting the header, not from the check.
+nginx sets `X-Forwarded-Proto $scheme`. Behind a TLS-terminating ingress or load balancer, $scheme is http, so the backend sees `http` while the browser's Origin is `https://...`. The mismatch comes from nginx overwriting the header, not from the check.
 
 #### Possible solutions
 
 ##### Explicit allowlist (most common for production)
 
-Set ALLOWED_ORIGINS=https://labs.example.com per environment, and don't derive trust from request headers at all.
+Set `ALLOWED_ORIGINS=https://labs.example.com` per environment, and don't derive trust from request headers at all.
 This is robust against any proxy chain. The code already supports it, because the exact-match fallback runs when sameOrigin fails.
 
 
 ##### Trust forwarded headers from your own proxies
 
-Each hop passes the original X-Forwarded-Proto and Host through instead of overwriting them. The backend then derives the public origin from them. This is only safe if the backend is reachable solely through those proxies.
-The ingress already sets X-Forwarded-Proto: https and preserves Host. The inner nginx should keep the incoming value and only fall back to $scheme when there is none:
+Each hop passes the original `X-Forwarded-Proto` and `Host` through instead of overwriting them. The backend then derives the public origin from them. This is only safe if the backend is reachable solely through those proxies.
+The ingress already sets `X-Forwarded-Proto: https` and preserves `Host`. The inner nginx should keep the incoming value and only fall back to $scheme when there is none:
 
 ```
 map $http_x_forwarded_proto $fwd_proto {
@@ -91,51 +91,6 @@ job.
 (with the `# syntax=docker/dockerfile:1` directive at the top) so the
 `type=gha` cache actually has npm/go module cache contents to persist,
 rather than just Docker layer cache.
-
-## CI/Docker: pin images and GitHub Actions by digest, not tag
-
-**Status:** not yet implemented
-
-**Context:** Currently Dockerfiles and `ci.yml` reference images/actions by
-mutable tags, e.g.:
-
-```dockerfile
-FROM node:20-alpine
-FROM nginxinc/nginx-unprivileged:1.27-alpine
-```
-
-```yaml
-uses: actions/checkout@v4
-uses: docker/build-push-action@v6
-uses: aquasecurity/trivy-action@0.24.0
-```
-
-Tags like `20-alpine` or `@v4` can be repointed by the upstream maintainer
-(or, in a worse case, by a compromised account) to a different image/commit
-without you knowing — this is a supply-chain risk. Pinning by immutable
-digest guarantees the exact same bytes are used every time, and changes only
-when you explicitly update the pin.
-
-**Planned fix (when hardening the pipeline):**
-
-- Docker base images: pin with `@sha256:...` digest, e.g.:
-  ```dockerfile
-  FROM node:20-alpine@sha256:<digest>
-  ```
-  Get the digest via `docker pull node:20-alpine && docker inspect --format='{{index .RepoDigests 0}}' node:20-alpine`.
-
-- GitHub Actions: pin with commit SHA instead of tag, e.g.:
-  ```yaml
-  uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-  ```
-  Keep the version as a trailing comment for readability. Tools like
-  Dependabot/Renovate can auto-update these pinned SHAs via PRs, so you don't
-  lose the ability to get updates — you just review them explicitly.
-
-**Trade-off:** more maintenance overhead (need a bot or manual process to
-bump digests), so this is worth doing once the pipeline is stable and before
-treating it as production-grade, but not essential for early development.
-
 
 ## Hetzner native K8s LoadBalancer via Hetzner CCM (K8s service of type LoadBalancer instead of manually configuring LB and attaching to NodePort service) 
 
@@ -222,4 +177,34 @@ should eventually look like:
 NAME            TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)
 labs-frontend   LoadBalancer   10.104.119.111   1.2.3.4          80:30105/TCP
 
-EXTERNAL-IP is now populated by the CCM. The CCM creates/configures the Hetzner LB and writes its address into the Service status. 
+EXTERNAL-IP is now populated by the CCM. The CCM creates/configures the Hetzner LB and writes its address into the Service status.
+
+## CI: Scheduled CVE expiration scanner with email notifications
+
+**Status:** not yet implemented
+
+**Context:** The `trivyignore.yaml` file in `.github/workflows/trivy/` contains ignored CVEs with RFC3339 `expired_at` dates. Over time, these expiration dates pass but the ignore entries may not be cleaned up or re-evaluated. This creates "zombie" ignores that allow stale CVE acceptances to linger unreviewed.
+
+**Goal:** Create a scheduled GitHub Actions workflow that:
+
+1. **Runs on schedule** (e.g., weekly via cron)
+2. **Parses trivyignore.yaml** and checks each entry's `expired_at` timestamp
+3. **Identifies expired entries** (where `expired_at < now()`)
+4. **Sends email notification** listing all expired CVEs with:
+   - CVE ID and expiration date
+   - Package and statement (justification)
+   - Link to the trivyignore.yaml file
+   - Instructions to either:
+     - Remove the entry if the issue is resolved
+     - Extend expiration if the CVE is still acceptable
+     - Escalate if the package should be upgraded
+5. **Optional:** Create a GitHub issue as a fallback/archive if email fails
+
+**Implementation approach:**
+
+Create `.github/workflows/trivy-expiration-check.yml` that:
+- Uses `deno` to run a new script `trivy-expiration-check.ts` (similar to trivy-gate.ts)
+- Reuses schema and parsing from existing trivy scripts
+- Uses GitHub Actions secrets for email configuration (SMTP or GitHub Actions email)
+- Outputs a summary to the workflow run and optionally creates an issue
+

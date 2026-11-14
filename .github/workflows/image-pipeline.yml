@@ -116,7 +116,7 @@ jobs:
             base_image: gcr.io/distroless/static-debian12@sha256:6d635b323e6ab633016668144d38e368e2894bd824500369151573225078ee03
             registry: https://gcr.io/v2/distroless
           - component: frontend
-            base_image: nginx/nginx-unprivileged:stable-alpine3.24@sha256:44e74ca483234093081138b6d7b6f561d55557756a2deefc3a5056148defeb99
+            base_image: nginx/nginx-unprivileged:stable-alpine3.24@sha256:3d70878f2682858f4bce0ad924262bf98cd223a73006fc6ffafa53d3d558044e
             registry: https://hub.docker.com/v2/namespaces
     env:
       COMPONENT: ${{ matrix.component }}
