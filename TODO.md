@@ -177,4 +177,34 @@ should eventually look like:
 NAME            TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)
 labs-frontend   LoadBalancer   10.104.119.111   1.2.3.4          80:30105/TCP
 
-EXTERNAL-IP is now populated by the CCM. The CCM creates/configures the Hetzner LB and writes its address into the Service status. 
+EXTERNAL-IP is now populated by the CCM. The CCM creates/configures the Hetzner LB and writes its address into the Service status.
+
+## CI: Scheduled CVE expiration scanner with email notifications
+
+**Status:** not yet implemented
+
+**Context:** The `trivyignore.yaml` file in `.github/workflows/trivy/` contains ignored CVEs with RFC3339 `expired_at` dates. Over time, these expiration dates pass but the ignore entries may not be cleaned up or re-evaluated. This creates "zombie" ignores that allow stale CVE acceptances to linger unreviewed.
+
+**Goal:** Create a scheduled GitHub Actions workflow that:
+
+1. **Runs on schedule** (e.g., weekly via cron)
+2. **Parses trivyignore.yaml** and checks each entry's `expired_at` timestamp
+3. **Identifies expired entries** (where `expired_at < now()`)
+4. **Sends email notification** listing all expired CVEs with:
+   - CVE ID and expiration date
+   - Package and statement (justification)
+   - Link to the trivyignore.yaml file
+   - Instructions to either:
+     - Remove the entry if the issue is resolved
+     - Extend expiration if the CVE is still acceptable
+     - Escalate if the package should be upgraded
+5. **Optional:** Create a GitHub issue as a fallback/archive if email fails
+
+**Implementation approach:**
+
+Create `.github/workflows/trivy-expiration-check.yml` that:
+- Uses `deno` to run a new script `trivy-expiration-check.ts` (similar to trivy-gate.ts)
+- Reuses schema and parsing from existing trivy scripts
+- Uses GitHub Actions secrets for email configuration (SMTP or GitHub Actions email)
+- Outputs a summary to the workflow run and optionally creates an issue
+
