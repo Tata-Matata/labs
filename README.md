@@ -41,6 +41,8 @@ pod via Kubernetes `pods/exec`.
 - [frontend](frontend): Angular application and frontend container build
 - [db](db): database initialization SQL
 - [k8s](k8s): Kubernetes manifests for the current deployment shape
+- [expose](expose): Traefik Helm values, Ingress, and cert-manager manifests for public HTTPS access
+- [expose.md](expose.md): documentation of the public exposure and TLS setup
 - [.github/workflows](.github/workflows): CI, release, and reusable image
   pipeline workflows
 - [local-db](local-db): local PostgreSQL helper assets
@@ -68,6 +70,17 @@ The repository includes:
 - Kubernetes manifests under [k8s](k8s) for a simple single-replica deployment
 
 The current Kubernetes manifests are intentionally simple and are suitable as a base for further environment automation and future release-driven manifest updates.
+
+## Public access and TLS
+
+The application is published at `tata-labs.com` over HTTPS only. It is still in development, so `tata-labs.com` might not always serve it. The setup is:
+
+- Hetzner DNS (A record) points the domain to a Hetzner Cloud Load Balancer, which forwards TCP port 443 to NodePort `30443` on the worker nodes
+- Traefik (ingress controller, installed with Helm using [expose/traefik-values.yaml](expose/traefik-values.yaml)) terminates TLS and routes to the `labs-frontend` Service through an Ingress
+- cert-manager obtains and renews the Let's Encrypt certificate using DNS-01 validation through the Hetzner DNS webhook
+- application Services stay `ClusterIP` and are not exposed directly
+
+See [expose.md](expose.md) for the full architecture and troubleshooting notes, and [expose/traefic.md](expose/traefic.md) for the Traefik configuration.
 
 ## Related infrastructure repository
 

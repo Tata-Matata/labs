@@ -42,7 +42,7 @@ metadata:
   name: labs-frontend
   namespace: labs
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: labs-frontend
   ports:
