@@ -20,7 +20,7 @@ jobs:
       TRIVY_JSON_REPORT: trivy-report.json
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       name: Check out repo
     - name: Pull base image
       run: docker pull "${{ inputs.image }}"

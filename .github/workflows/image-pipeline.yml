@@ -33,7 +33,7 @@ jobs:
   test-backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         # lets the calling pipeline pick which ref to build
         with:
           ref: ${{ inputs.git_ref }}
@@ -47,7 +47,7 @@ jobs:
   test-frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.git_ref }}
       - uses: actions/setup-node@v7
@@ -70,7 +70,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.git_ref }}
       # NOTE: trivy-action version is pinned in 3 places in this reusable
@@ -124,7 +124,7 @@ jobs:
       TRIVY_SARIF: trivy-${{ matrix.component }}-results.sarif
       TRIVY_JSON: trivy-${{ matrix.component }}-results.json
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.git_ref }}
       - name: Install Deno
