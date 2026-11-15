@@ -208,3 +208,15 @@ Create `.github/workflows/trivy-expiration-check.yml` that:
 - Uses GitHub Actions secrets for email configuration (SMTP or GitHub Actions email)
 - Outputs a summary to the workflow run and optionally creates an issue
 
+## Certificate rotation
+
+Need to build in continuous monitoring 
+
+kubeadm certs check-expiration
+
+
+## TLS Termination on LoadBalancer
+
+as alternative to TLS termination at ingress controller
+
+s. expose.md
