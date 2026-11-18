@@ -29,7 +29,7 @@ At the moment, the application is split into three runtime services:
 
 - `labs-frontend`: serves the web UI
 - `labs-backend`: serves the API and reads lab content from PostgreSQL
-- `labs-postgres`: stores lab metadata
+- `labs-postgres`: stores lab metadata in a CloudNativePG-managed PostgreSQL cluster
 
 The frontend talks to the backend through `/api`, and the backend reads its
 connection details from environment configuration. The browser terminal is backed by a websocket stream that the backend bridges into the `labs-shell`

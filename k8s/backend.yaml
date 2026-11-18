@@ -23,8 +23,8 @@ spec:
             - name: DB_URL
               valueFrom:
                 secretKeyRef:
-                  name: labs-app-secrets
-                  key: DB_URL
+                  name: labs-postgres-app
+                  key: uri
             - name: TERMINAL_NAMESPACE
               valueFrom:
                 fieldRef:

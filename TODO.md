@@ -145,6 +145,7 @@ Be careful with already existing nodes, check Hetzner docs
 
 5. The Service becomes LoadBalancer
 
+```
 apiVersion: v1
 kind: Service
 metadata:
@@ -162,7 +163,7 @@ spec:
       port: 80
       targetPort: 80
 
-
+```
 Kubernetes will allocate a NodePort automatically, for example:
 
 80:30105/TCP
@@ -170,12 +171,16 @@ Kubernetes will allocate a NodePort automatically, for example:
 
 And now:
 
+```
 kubectl get svc labs-frontend
+```
 
 should eventually look like:
 
+```
 NAME            TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)
 labs-frontend   LoadBalancer   10.104.119.111   1.2.3.4          80:30105/TCP
+```
 
 EXTERNAL-IP is now populated by the CCM. The CCM creates/configures the Hetzner LB and writes its address into the Service status.
 
@@ -220,3 +225,36 @@ kubeadm certs check-expiration
 as alternative to TLS termination at ingress controller
 
 s. expose.md
+
+
+## Add to Ansible configuration CNPG installation with Helm?
+
+```
+helm repo add cnpg https://cloudnative-pg.github.io/charts
+helm repo update
+helm search repo cnpg/cloudnative-pg --versions
+```
+
+Install the operator:
+
+```
+helm upgrade --install cnpg \
+  cnpg/cloudnative-pg \
+  --namespace cnpg-system \
+  --create-namespace \
+  --wait
+```
+
+This deploys:
+
+- The CNPG controller
+- Webhook services
+- CNPG Custom Resource Definitions
+- Cluster-wide RBAC resources
+
+Validate:
+
+```
+kubectl get pods -n cnpg-system
+kubectl get crd | grep postgresql.cnpg.io
+```
