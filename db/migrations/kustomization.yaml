@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: labs
+
+configMapGenerator:
+  - name: labs-db-migrations
+    files:
+      - 000001_create_labs.down.sql
+      - 000001_create_labs.up.sql
+      - 000002_seed_labs.down.sql
+      - 000002_seed_labs.up.sql
+
+generatorOptions:
+  disableNameSuffixHash: true

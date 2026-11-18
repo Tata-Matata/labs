@@ -15,6 +15,3 @@ spec:
     initdb:
       database: labs
       owner: labs
-      postInitApplicationSQLRefs:
-        configMapRefs:
-          - name: labs-postgres-init
